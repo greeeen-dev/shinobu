@@ -5,7 +5,7 @@ on: [push, pull_request]
 jobs:
   build:
     name: "Pylint"
-    runs-on: ${{ inputs.os }}
+    runs-on: [ubuntu-latest, windows-latest]
     permissions:
       contents: read
     strategy:
