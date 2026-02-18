@@ -1,0 +1,6 @@
+py-cord
+python-dotenv
+pycryptodome
+ujson
+orjson
+tomli-w
