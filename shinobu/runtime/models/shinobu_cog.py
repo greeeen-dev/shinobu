@@ -1,4 +1,4 @@
-from discord.ext import commands
+from discord.ext import commands, bridge
 from shinobu.runtime.secrets import fine_grained
 
 class ShinobuCogMetadata:
@@ -28,7 +28,7 @@ class ShinobuCogMetadata:
 
 class ShinobuCog(commands.Cog):
     def __init__(self, bot):
-        self.bot: commands.Bot = bot
+        self.bot: bridge.Bot = bot
         self._shinobu_metadata: ShinobuCogMetadata | None = None
         self._shinobu_secrets: fine_grained.FineGrainedSecrets | None = None
         self._shinobu_files: fine_grained.FineGrainedSecureFiles | None = None
