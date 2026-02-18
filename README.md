@@ -16,3 +16,14 @@ done and over with.
 
 So I'm starting from a clean state and building a new bridge that better adapts to today's needs,
 that's also flexible and ready for the demands of tomorrow.
+
+## Todo
+- [ ] Shinobu Runtime (core, secrets manager, debug tools, etc)
+- [ ] Basic Discord cross-server bridge
+- [ ] Stoat (formerly Revolt) support
+- [ ] Fluxer support
+- [ ] Moderation & customization tools
+
+### And the stuff reserved for later
+- [ ] Spacebar support
+- [ ] Matrix support
