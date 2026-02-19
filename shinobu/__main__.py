@@ -141,7 +141,9 @@ class SecretsIssuingAuthority:
         self._cogs_registered_files = {}
 
         # Load builtin manifest
-        self._load_manifest("shinobu/runtime/manifest.json")
+        self._load_manifest(
+            os.path.join(os.path.dirname(__file__), "shinobu/runtime/manifest.json")
+        )
 
         if not os.path.exists("plugins"):
             # There's no plugins to load!
