@@ -25,6 +25,7 @@ import orjson
 import getpass
 import discord
 from discord.ext import commands
+from dotenv import load_dotenv
 from shinobu.runtime import runtime
 from shinobu.runtime.secrets import manager, fine_grained, encryptor
 from shinobu.runtime.models import shinobu_cog
@@ -482,8 +483,15 @@ def start_secrets_cli():
 # Start Shinobu Runtime
 if __name__ == "__main__":
     try:
-        # Prompt for password
-        password = getpass.getpass("Encryption password: ")
+        load_dotenv()
+
+        # Check if password is in env file (dangerous!)
+        if os.environ.get("SHINOBU_ENCRYPTION_PASSWORD"):
+            print("WARNING: Inheriting password from .env file. Do not store your password here for production environments.")
+            password = os.environ.get("SHINOBU_ENCRYPTION_PASSWORD")
+        else:
+            # Prompt for password (safer!)
+            password = getpass.getpass("Encryption password: ")
 
         if launch_secrets_cli:
             start_secrets_cli()
@@ -492,3 +500,5 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("Exiting...")
         sys.exit(0)
+    else:
+        print("Exiting...")
