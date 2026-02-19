@@ -4,10 +4,8 @@ from shinobu.runtime.models import shinobu_cog
 
 class ShinobuEvents(shinobu_cog.ShinobuCog):
     def __init__(self, bot, **kwargs):
-        # Register cog metadata
-        self.setup_shinobu_cog(
+        super().__init__(
             bot,
-            **kwargs,
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
                 name="Events",
                 description="A cog handling Shinobu bot events.",

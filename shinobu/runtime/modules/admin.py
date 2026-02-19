@@ -19,11 +19,9 @@ def is_owner(ctx):
     return ctx.message.author.id == 356456393491873795
 
 class Admin(shinobu_cog.ShinobuCog):
-    def __init__(self, bot, **kwargs):
-        # Register cog metadata
-        self.setup_shinobu_cog(
+    def __init__(self, bot):
+        super().__init__(
             bot,
-            **kwargs,
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
                 name="Admin",
                 description="Admin commands",

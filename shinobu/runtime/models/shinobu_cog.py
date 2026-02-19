@@ -27,20 +27,11 @@ class ShinobuCogMetadata:
         return self._visible_in_help
 
 class ShinobuCog(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot, shinobu_metadata: ShinobuCogMetadata | None = None):
         self.bot: bridge.Bot = bot
-        self._shinobu_metadata: ShinobuCogMetadata | None = None
+        self._shinobu_metadata: ShinobuCogMetadata | None = shinobu_metadata
         self._shinobu_secrets: fine_grained.FineGrainedSecrets | None = None
         self._shinobu_files: fine_grained.FineGrainedSecureFiles | None = None
-
-    def setup_shinobu_cog(self, bot, **kwargs):
-        self.bot = bot
-        self._shinobu_secrets: fine_grained.FineGrainedSecrets | None = None
-        self._shinobu_files: fine_grained.FineGrainedSecureFiles | None = None
-
-        # Get secure files wrapper if it exists
-        if "files_wrapper" in kwargs:
-            self._shinobu_files = kwargs.get("files_wrapper")
 
     def issue_entitlements(self, secrets: fine_grained.FineGrainedSecrets | None = None,
                            files: fine_grained.FineGrainedSecureFiles | None = None):
