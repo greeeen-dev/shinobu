@@ -142,7 +142,7 @@ class SecretsIssuingAuthority:
 
         # Load builtin manifest
         self._load_manifest(
-            os.path.join(os.path.dirname(__file__), "shinobu/runtime/manifest.json")
+            os.path.join(os.path.dirname(__file__), "runtime/manifest.json")
         )
 
         if not os.path.exists("plugins"):
