@@ -5,12 +5,13 @@ on: [push, pull_request]
 jobs:
   build:
     name: "Pylint"
-    runs-on: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
     strategy:
       matrix:
         python-version: ["3.12", "3.13"]
+        os: [ubuntu-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
         with:
