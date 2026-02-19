@@ -1,0 +1,13 @@
+{
+  "name": "Shinobu Builtin Modules",
+  "description": "Modules packaged with Shinobu",
+  "version": "0.1.0",
+  "releaseId": 0,
+  "modules": [],
+  "intents": {
+    "entitlements_files": "Entitlement needed for beacon.json to store bridge data."
+  },
+  "entitlements_files": {
+    "shinobu.beacon.cogs.backend": ["beacon"]
+  }
+}

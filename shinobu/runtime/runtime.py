@@ -40,8 +40,14 @@ class ShinobuBot(bridge.Bot):
         self.__shared_objects: ShinobuSharedObjects = ShinobuSharedObjects()
         self.__cog_entitlements_loader = None
 
+        # Get manifest
+        self._manifest: str | None = None
+        if "manifest" in kwargs:
+            self._manifest = kwargs["manifest"]
+
         # Load events handler (this doesn't need entitlements)
         self.load_extension("shinobu.runtime.modules.events")
+        self.load_extension("shinobu.runtime.modules.admin")
 
     def setup_entitlements_loader(self, loader):
         if self.__cog_entitlements_loader:
@@ -53,8 +59,8 @@ class ShinobuBot(bridge.Bot):
         if not self.__cog_entitlements_loader:
             raise RuntimeError("Cog loader not registered yet")
 
-        # Load builtin modules
-        with open(os.path.join(os.path.dirname(__file__), "manifest.json")) as file:
+        # Load builtin modules (separate from runtime modules)
+        with open(self._manifest) as file:
             data: dict = json.load(file)
 
         for module in data["modules"]:

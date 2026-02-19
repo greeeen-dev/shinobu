@@ -18,7 +18,7 @@ So I'm starting from a clean state and building a new bridge that better adapts 
 that's also flexible and ready for the demands of tomorrow.
 
 ## Todo
-- [ ] Shinobu Runtime (core, secrets manager, debug tools, etc)
+- [X] Shinobu Runtime (core, secrets manager, debug tools, etc)
 - [ ] Basic Discord cross-server bridge
 - [ ] Stoat (formerly Revolt) support
 - [ ] Fluxer support

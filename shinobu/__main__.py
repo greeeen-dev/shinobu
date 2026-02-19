@@ -30,6 +30,9 @@ from shinobu.runtime.secrets import manager, fine_grained, encryptor
 from shinobu.runtime.models import shinobu_cog
 from shinobu.cli import secrets as secrets_cli
 
+# Manifest path
+manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
+
 # Prevent attacks via import
 if __name__ != "__main__":
     raise RuntimeError("Bootscript should not be imported!")
@@ -141,9 +144,7 @@ class SecretsIssuingAuthority:
         self._cogs_registered_files = {}
 
         # Load builtin manifest
-        self._load_manifest(
-            os.path.join(os.path.dirname(__file__), "runtime/manifest.json")
-        )
+        self._load_manifest(manifest_path)
 
         if not os.path.exists("plugins"):
             # There's no plugins to load!
@@ -460,7 +461,7 @@ def start_bot():
     intents.presences = False
 
     # Create Shinobu bot instance
-    bot: runtime.ShinobuBot = runtime.ShinobuBot(command_prefix="sh!", intents=intents)
+    bot: runtime.ShinobuBot = runtime.ShinobuBot(command_prefix="sh!", intents=intents, manifest=manifest_path)
     bot.setup_entitlements_loader(ModuleLoader(bot))
     bot.load_builtins()
 
