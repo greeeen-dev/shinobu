@@ -26,8 +26,7 @@ class HelloWorld(shinobu_cog.ShinobuCog):
 
         # Test 1: Check secrets access
         try:
-            not_a_secret = self._shinobu_secrets.retrieve("NOT_A_SECRET")
-            print(f'Secret: {not_a_secret}')
+            self._shinobu_secrets.retrieve("NOT_A_SECRET")
         except:
             traceback.print_exc()
             test_pass = False
