@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import os
 import ujson as json
 import discord
 from discord.ext import bridge
@@ -53,7 +54,7 @@ class ShinobuBot(bridge.Bot):
             raise RuntimeError("Cog loader not registered yet")
 
         # Load builtin modules
-        with open("shinobu/runtime/manifest.json") as file:
+        with open(os.path.join(os.path.dirname(__file__), "runtime/manifest.json")) as file:
             data: dict = json.load(file)
 
         for module in data["modules"]:
