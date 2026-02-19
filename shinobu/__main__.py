@@ -27,6 +27,7 @@ import discord
 from discord.ext import commands
 from shinobu.runtime import runtime
 from shinobu.runtime.secrets import manager, fine_grained, encryptor
+from shinobu.runtime.models import shinobu_cog
 from shinobu.cli import secrets as secrets_cli
 
 # Prevent attacks via import
@@ -39,16 +40,19 @@ parser = argparse.ArgumentParser(
     description="Converse from anywhere, anytime. Shinobu is a versatile cross-platform bridge bot."
 )
 parser.add_argument("--secrets", help="Launches the Secrets Manager CLI.", action="store_true")
-args = parser.parse_args()
+launch_args = parser.parse_args()
 
 # Get launch options
-launch_secrets_cli: bool = args.secrets
+launch_secrets_cli: bool = launch_args.secrets
 
 # Create TokenStore variable (do not initialize yet)
 tokenstore: manager.TokenStore | None = None
 
 # Create RawEncryptor variable (do not initialize yet)
 raw_encryptor: manager.RawEncryptor | None = None
+
+# Create password variable
+password: str | None = None
 
 class SecretsIssuingAuthority:
     """Issues FineGrainedSecrets objects."""
@@ -76,7 +80,8 @@ class SecretsIssuingAuthority:
 
         # Check if we even have requested entitlements
         if len(entitlements.keys()) == 0:
-            return False
+            # We'll assume these are valid
+            return True
 
         # Run sanity checks
         invalid_entitlements = False
@@ -85,18 +90,48 @@ class SecretsIssuingAuthority:
                 # Stop as check failed already
                 break
 
-            if type(entitlement) is not list:
+            if type(entitlements[entitlement]) is not list:
                 # Stop checks
                 invalid_entitlements = True
                 break
 
-            for cog in entitlements[entitlement]:
-                if type(cog) is not str:
+            for secret in entitlements[entitlement]:
+                if type(secret) is not str:
                     # Stop checks on next loop
                     invalid_entitlements = True
                     break
 
         return not invalid_entitlements
+
+    def _load_manifest(self, filepath):
+        # Read plugin data
+        with open(filepath, 'r') as file:
+            data = json.load(file)
+
+        # Retrieve entitlements
+        entitlements_secrets = data.get("entitlements_secrets", {})
+        entitlements_files = data.get("entitlements_files", {})
+
+        # Does the module describe its intents?
+        intents = data.get("intents", {})
+        if "entitlements_secrets" not in intents:
+            entitlements_secrets = {}
+        if "entitlements_files" not in intents:
+            entitlements_files = {}
+
+        # Run sanity checks
+        entitlements_secrets_valid = self._sanity_check(entitlements_secrets)
+        entitlements_files_valid = self._sanity_check(entitlements_files)
+
+        # Just to be strict, we'll enforce both entitlements to be valid
+        if not entitlements_secrets_valid and entitlements_files_valid:
+            return
+
+        # Grant entitlements
+        for cog in entitlements_secrets:
+            self._cogs_registered_secrets.update({cog: entitlements_secrets[cog]})
+        for cog in entitlements_files:
+            self._cogs_registered_files.update({cog: entitlements_files[cog]})
 
     def load_plugins(self):
         if self._cogs_registered_secrets is not None or self._cogs_registered_files is not None:
@@ -104,6 +139,9 @@ class SecretsIssuingAuthority:
 
         self._cogs_registered_secrets = {}
         self._cogs_registered_files = {}
+
+        # Load builtin manifest
+        self._load_manifest("shinobu/runtime/manifest.json")
 
         if not os.path.exists("plugins"):
             # There's no plugins to load!
@@ -115,27 +153,8 @@ class SecretsIssuingAuthority:
             if not plugin.endswith(".json"):
                 continue
 
-            # Read plugin data
-            with open(f"plugins/{plugin}", 'r') as file:
-                data = json.load(file)
-
-            # Retrieve entitlements
-            entitlements_secrets = data.get("entitlements_secrets", {})
-            entitlements_files = data.get("entitlements_files", {})
-
-            # Run sanity checks
-            entitlements_secrets_valid = self._sanity_check(entitlements_secrets)
-            entitlements_files_valid = self._sanity_check(entitlements_files)
-
-            # Just to be strict, we'll enforce both entitlements to be valid
-            if not entitlements_secrets_valid or not entitlements_files_valid:
-                continue
-
-            # Grant entitlements
-            for cog in entitlements_secrets:
-                self._cogs_registered_secrets.update({cog: entitlements_secrets[cog]})
-            for cog in entitlements_files:
-                self._cogs_registered_files.update({cog: entitlements_files[cog]})
+            # Grant entitlements for plugin
+            self._load_manifest(plugin)
 
     def check_cog_secrets_entitlements(self, cog: str) -> bool:
         """Checks if a cog has entitlements to secrets."""
@@ -168,7 +187,7 @@ class SecretsIssuingAuthority:
 
         # Issue wrapper
         wrapper: fine_grained.FineGrainedSecureFiles = self.issue(
-            self._cogs_registered_secrets.get(cog, []),
+            self._cogs_registered_files.get(cog, []),
             is_file=True
         )
         self._cogs_wrapper_map_files.update({cog: wrapper})
@@ -190,8 +209,11 @@ class SecretsIssuingAuthority:
             if type(entitlement) is not str:
                 raise ValueError("Entitlement must be a string")
 
-            if entitlement in self._accessed_secrets:
+            if entitlement in self._accessed_secrets and not is_file:
                 raise ValueError(f"Entitlement to secret {entitlement} already issued")
+
+            if entitlement in self._accessed_files and is_file:
+                raise ValueError(f"Entitlement to file {entitlement} already issued")
 
         # Issue entitlements
         if is_file:
@@ -242,9 +264,16 @@ class SecretsIssuingAuthority:
         # Ensure wrapper has entitlements
         self._check_file_entitlement(wrapper, filename)
 
+        if not filename.isalnum():
+            raise ValueError("Filename should be alphanumeric")
+
         # Load file
-        with open(f"data/{filename}.json", 'r') as file:
-            data: dict = json.load(file)
+        try:
+            with open(f"data/{filename}.json", 'r') as file:
+                data: dict = json.load(file)
+        except FileNotFoundError:
+            # Return empty file
+            return ""
 
         encrypted_data = encryptor.GCMEncryptedData.from_dict(data)
 
@@ -289,40 +318,128 @@ class ActualFineGrainedSecureFiles(fine_grained.FineGrainedSecureFiles):
     def save_json(self, filename: str, data: dict):
         secrets_authority.save(self, filename, orjson.dumps(data).decode())
 
+class ExtensionCogMap:
+    """Keeps track of extensions and its cogs."""
+
+    def __init__(self):
+        self.__map = {}
+        self.__applied = []
+
+    @staticmethod
+    def check_for_match(extension, cog):
+        """Checks if an extension has a possible match with a cog."""
+
+        # Ensure cog is a subclass of shinobu_cog.ShinobuCog
+        if (
+                type(cog) is commands.Cog or type(cog) is shinobu_cog.ShinobuCog or
+                not isinstance(cog, shinobu_cog.ShinobuCog)
+        ):
+            raise TypeError("Cog must be a subclass of shinobu_cog.ShinobuCog")
+
+        # Get expected cog type
+        try:
+            expected_type = extension.get_cog_type()
+        except AttributeError:
+            return False
+
+        return type(cog) is expected_type
+
+    def add(self, extension, cog):
+        if extension in self.__map:
+            raise KeyError("Extension already mapped")
+
+        if type(cog) in self.__applied:
+            raise ValueError("Cog already mapped to an extension")
+
+        self.__map.update({extension: cog})
+        self.__applied.append(type(cog))
+
+    def get(self, extension):
+        return self.__map.get(extension)
+
+# Create ExtensionCogMap variable (do not initialize yet)
+extension_map: ExtensionCogMap | None = None
+
 class ModuleLoader:
     """Loads a plugin with all of its entitlements."""
 
     def __init__(self, bot: commands.Bot):
         self.bot: commands.Bot = bot
 
-    def load(self, cog, *args, **kwargs):
-        """Loads a cog."""
+    @staticmethod
+    def _get_entitlements(package: str) -> dict:
+        """Returns a dict with entitlements."""
 
         extras: dict = {}
 
         # Check if we have entitlements
-        has_secrets_entitlements: bool = secrets_authority.check_cog_secrets_entitlements(cog)
-        has_files_entitlements: bool = secrets_authority.check_cog_files_entitlements(cog)
+        has_secrets_entitlements: bool = secrets_authority.check_cog_secrets_entitlements(package)
+        has_files_entitlements: bool = secrets_authority.check_cog_files_entitlements(package)
 
         if has_secrets_entitlements:
-            extras.update({"secrets_wrapper": secrets_authority.issue_secrets_cog(cog)})
+            extras.update({"secrets_wrapper": secrets_authority.issue_secrets_cog(package)})
         if has_files_entitlements:
-            extras.update({"files_wrapper": secrets_authority.issue_files_cog(cog)})
+            extras.update({"files_wrapper": secrets_authority.issue_files_cog(package)})
 
-        # Update kwargs to add wrappers
-        if "extras" in kwargs:
-            kwargs["extras"].update(extras)
-        else:
-            kwargs.update({"extras": extras})
+        return extras
 
-        self.bot.load_extension(cog, *args, **kwargs)
+    def _issue_entitlements(self, package: str):
+        """Issues entitlements to an extension."""
+
+        # Get entitlements
+        entitlements: dict = self._get_entitlements(package)
+
+        # Save time by not going through the cog scan if there's no entitlements
+        if len(entitlements) == 0:
+            return
+
+        # Try to get matching cog from cache
+        matching_cog: shinobu_cog.ShinobuCog | commands.Cog | None = extension_map.get(package)
+
+        if not matching_cog:
+            # Fetch matching cog
+            extension_obj = self.bot.extensions[package]
+
+            for cog in self.bot.cogs:
+                cog_obj = self.bot.cogs[cog]
+                has_match: bool = extension_map.check_for_match(extension_obj, cog_obj)
+
+                if has_match:
+                    # Cache for future reference
+                    matching_cog = cog_obj
+                    extension_map.add(package, cog_obj)
+                    break
+
+        if matching_cog:
+            # Issue entitlements
+            if isinstance(matching_cog, shinobu_cog.ShinobuCog):
+                matching_cog.issue_entitlements(
+                    secrets=entitlements.get("secrets_wrapper"),
+                    files=entitlements.get("files_wrapper")
+                )
+
+    def load_extension(self, package: str, *args, **kwargs):
+        """Loads a cog and registers entitlements if available."""
+
+        # Load extension
+        self.bot.load_extension(package, *args, **kwargs)
+
+        # Issue entitlements
+        self._issue_entitlements(package)
+
+    def reload(self, cog, *args, **kwargs):
+        """Loads a cog."""
+
+        entitlements: dict = self._get_entitlements(cog)
+
+        self.bot.reload_extension(cog, *args, **kwargs)
 
 def start_bot():
     """Starts Shinobu!"""
 
-    global tokenstore, secrets_authority, raw_encryptor
+    global tokenstore, secrets_authority, raw_encryptor, extension_map, password
 
-    # Regenerate tokenstore, secrets issuing authority, raw encryptor and cog loader
+    # Regenerate bootscript-level objects
     tokenstore = manager.TokenStore(
         password,
         debug=False,
@@ -333,6 +450,7 @@ def start_bot():
     raw_encryptor = manager.RawEncryptor(
         password
     )
+    extension_map = ExtensionCogMap()
 
     # Create intents object
     intents = discord.Intents.all()
@@ -341,13 +459,15 @@ def start_bot():
 
     # Create Shinobu bot instance
     bot: runtime.ShinobuBot = runtime.ShinobuBot(command_prefix="sh!", intents=intents)
-    bot.setup_loader(ModuleLoader(bot))
+    bot.setup_entitlements_loader(ModuleLoader(bot))
+    bot.load_builtins()
 
     # Start bot!
     bot.run(tokenstore.retrieve("TOKEN"))
 
 def start_secrets_cli():
     """Launches the Secrets Manager CLI."""
+    global password
     cli_tokenstore = manager.TokenStore(
         password,
         debug=False,

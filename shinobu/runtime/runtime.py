@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import ujson as json
 import discord
 from discord.ext import bridge
 
@@ -36,24 +37,32 @@ class ShinobuBot(bridge.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__shared_objects: ShinobuSharedObjects = ShinobuSharedObjects()
-        self.__runtime_cog_loader = None
+        self.__cog_entitlements_loader = None
 
         # Load events handler (this doesn't need entitlements)
         self.load_extension("shinobu.runtime.modules.events")
 
-        # Load hello world for debug
-        self.load_extension("shinobu.runtime.modules.hello_world")
-
-    def setup_loader(self, loader):
-        if self.__runtime_cog_loader:
+    def setup_entitlements_loader(self, loader):
+        if self.__cog_entitlements_loader:
             raise RuntimeError("Cog loader already registered")
 
-        self.__runtime_cog_loader = loader
+        self.__cog_entitlements_loader = loader
+
+    def load_builtins(self):
+        if not self.__cog_entitlements_loader:
+            raise RuntimeError("Cog loader not registered yet")
+
+        # Load builtin modules
+        with open("shinobu/runtime/manifest.json") as file:
+            data: dict = json.load(file)
+
+        for module in data["modules"]:
+            self.__cog_entitlements_loader.load_extension(module)
 
     @property
     def shared_objects(self):
         return self.__shared_objects
 
     @property
-    def runtime_cog_loader(self):
-        return self.__runtime_cog_loader
+    def cog_entitlements_loader(self):
+        return self.__cog_entitlements_loader

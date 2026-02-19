@@ -35,18 +35,21 @@ class ShinobuCog(commands.Cog):
 
     def setup_shinobu_cog(self, bot, **kwargs):
         self.bot = bot
-
-        # Get metadata if it exists
-        if "shinobu_metadata" in kwargs:
-            self._shinobu_metadata = kwargs.get("shinobu_metadata")
-
-        # Get secrets wrapper if it exists
-        if "secrets_wrapper" in kwargs:
-            self._shinobu_secrets = kwargs.get("secrets_wrapper")
+        self._shinobu_secrets: fine_grained.FineGrainedSecrets | None = None
+        self._shinobu_files: fine_grained.FineGrainedSecureFiles | None = None
 
         # Get secure files wrapper if it exists
         if "files_wrapper" in kwargs:
             self._shinobu_files = kwargs.get("files_wrapper")
+
+    def issue_entitlements(self, secrets: fine_grained.FineGrainedSecrets | None = None,
+                           files: fine_grained.FineGrainedSecureFiles | None = None):
+        """Issues entitlements to a Shinobu cog."""
+
+        if self._shinobu_secrets is None:
+            self._shinobu_secrets = secrets
+        if self._shinobu_files is None:
+            self._shinobu_files = files
 
     @property
     def shinobu_metadata(self) -> ShinobuCogMetadata:
