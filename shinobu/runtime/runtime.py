@@ -54,7 +54,7 @@ class ShinobuBot(bridge.Bot):
             raise RuntimeError("Cog loader not registered yet")
 
         # Load builtin modules
-        with open(os.path.join(os.path.dirname(__file__), "runtime/manifest.json")) as file:
+        with open(os.path.join(os.path.dirname(__file__), "manifest.json")) as file:
             data: dict = json.load(file)
 
         for module in data["modules"]:
