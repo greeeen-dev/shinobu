@@ -51,6 +51,12 @@ class ShinobuCog(commands.Cog):
         if self._shinobu_files is None:
             self._shinobu_files = files
 
+        self.on_entitlements_issued()
+
+    def on_entitlements_issued(self):
+        """Method called when entitlements are issued. Overwrite this as needed."""
+        return
+
     @property
     def shinobu_metadata(self) -> ShinobuCogMetadata:
         return self._shinobu_metadata
