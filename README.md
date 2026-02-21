@@ -19,10 +19,10 @@ that's also flexible and ready for the demands of tomorrow.
 
 ## Todo
 - [X] Shinobu Runtime (core, secrets manager, debug tools, etc)
-- [ ] Basic Discord cross-server bridge
-- [ ] Stoat (formerly Revolt) support
-- [ ] Fluxer support
-- [ ] Moderation & customization tools
+- [ ] Basic Discord cross-server bridge (v0.1)
+- [ ] Stoat (formerly Revolt) support (v0.2)
+- [ ] Fluxer support (v0.2/v0.3)
+- [ ] Moderation & customization tools (v0.3/v1)
 
 ### And the stuff reserved for later
 - [ ] Spacebar support
