@@ -18,30 +18,34 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.protocol import beacon
+from shinobu.beacon.discord import driver
 
-class BeaconBackend(shinobu_cog.ShinobuCog):
+class DiscordDriverParent(shinobu_cog.ShinobuCog):
     def __init__(self, bot):
         # Register cog metadata
         super().__init__(
             bot,
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
-                name="Beacon Backend",
-                description="Manages the Shinobu Beacon bridge protocol.",
+                name="Beacon Discord driver",
+                description="Manages the Beacon driver for Discord.",
                 visible_in_help=True
             )
         )
 
-    def on_entitlements_issued(self):
-        # We will initialize Beacon here
-        if self.bot.shared_objects.get("beacon"):
-            # Beacon already initialized
+        # Get Beacon
+        self.beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
+
+        # Check if driver is already initialized
+        if "discord" in self.beacon.drivers:
             return
 
-        beacon_obj: beacon.Beacon = beacon.Beacon(self.bot, self._shinobu_files)
-        self.bot.shared_objects.add("beacon", beacon_obj)
+        # Register driver
+        self.beacon.drivers.register_driver("discord", driver.DiscordDriver(
+            self.bot, self.beacon.messages
+        ))
 
 def get_cog_type():
-    return BeaconBackend
+    return DiscordDriverParent
 
 def setup(bot):
-    bot.add_cog(BeaconBackend(bot))
+    bot.add_cog(DiscordDriverParent(bot))

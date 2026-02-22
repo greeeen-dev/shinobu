@@ -5,7 +5,8 @@
   "releaseId": 0,
   "requiredId": 0,
   "modules": [
-    "shinobu.beacon.cogs.backend"
+    "shinobu.beacon.cogs.backend",
+    "shinobu.beacon.discord.parent"
   ],
   "intents": {
     "entitlements_files": "Entitlement needed for beacon and cache to store bridge data."

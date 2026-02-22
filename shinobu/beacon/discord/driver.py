@@ -20,6 +20,7 @@ import io
 import discord
 from datetime import datetime
 from discord.ext import bridge
+from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
                                    member as beacon_member, channel as beacon_channel, webhook as beacon_webhook,
                                    message as beacon_message, messageable as beacon_messageable,
@@ -187,8 +188,8 @@ class DiscordBeaconFilesConverter:
         return [discord.File(fp=io.BytesIO(file.data), filename=file.filename, spoiler=file.spoiler) for file in files]
 
 class DiscordDriver(beacon_driver.BeaconDriver):
-    def __init__(self, bot, *args, **kwargs):
-        super().__init__("discord", bot, *args, **kwargs)
+    def __init__(self, bot, message_cache: beacon_messages.BeaconMessageCache):
+        super().__init__("discord", bot, message_cache)
 
         # Overwrite self.bot (to set typing)
         self.bot: bridge.Bot = bot
