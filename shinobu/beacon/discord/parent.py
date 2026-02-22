@@ -116,7 +116,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
                     pass
 
             if reply_message:
-                uses_components_v2: bool = discord.MessageFlags.is_components_v2 in message.reference.cached_message.flags
+                uses_components_v2: bool = reply_message.flags.is_components_v2
 
                 if uses_components_v2:
                     # Get component 300 (text display)
@@ -153,7 +153,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             blocks=blocks,
             files=files,
             replies=replies,
-            reply_content=self._driver.sanitize_outbound(reply_content),
+            reply_content=self._driver.sanitize_outbound(reply_content) if reply_content else None,
             reply_attachments=reply_attachments
         )
 

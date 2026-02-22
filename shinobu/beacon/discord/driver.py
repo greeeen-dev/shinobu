@@ -311,27 +311,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
             reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
             reply_url: str = f"https://discord.com/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
-            reply_content: str | None = None
-
-            # Get message content
-            if content.reply_content:
-                reply_content = content.reply_content
-            else:
-                # Fetch message
-                channel = self.bot.get_channel(int(reply_message.channel.id))
-
-                try:
-                    message = await channel.fetch_message(int(reply_message.id))
-                except discord.HTTPException:
-                    pass
-                else:
-                    if discord.MessageFlags.is_components_v2 in message.flags:
-                        # Get component with ID 300 (this is our text component)
-                        message_text_block: discord.Component = message.get_component(300)
-
-                        # Is the component a text block as expected?
-                        if isinstance(message_text_block, discord.TextDisplay):
-                            reply_content = message_text_block.content
+            reply_content: str | None = content.reply_content
 
             # Create reply container (will get ID 10X)
             reply_container: discord.ui.Container = discord.ui.Container()
@@ -371,15 +351,21 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
             # Add button to legacy reply components
             available_trimmed_space = 80 - len(f'Replying to @{reply_author} - ')
-            reply_content_trimmed = reply_content
-            if len(reply_content) > available_trimmed_space:
-                reply_content_trimmed = reply_content[:(available_trimmed_space - 3)] + "..."
+            reply_content_trimmed: str | None = reply_content
+
+            if reply_content:
+                if len(reply_content) > available_trimmed_space:
+                    reply_content_trimmed = reply_content[:(available_trimmed_space - 3)] + "..."
+
+            reply_button_text: str = f'Replying to @{reply_author}'
+            if reply_content_trimmed:
+                reply_button_text = f'Replying to @{reply_author} | {reply_content_trimmed}'
 
             # noinspection PyTypeChecker
             legacy_reply_components.add_item(discord.ui.ActionRow(
                 discord.ui.Button(
                     style=discord.ButtonStyle.link,
-                    label=f'Replying to @{reply_author} - {reply_content_trimmed}',
+                    label=reply_button_text,
                     emoji='\U000021AA\U0000FE0F',
                     url=reply_url
                 )
@@ -427,29 +413,44 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             )
 
     def sanitize_outbound(self, content: str) -> str:
-        user_mentions = [item.split('>')[0] for item in content.split("<@")]
-        channel_mentions = [item.split('>')[0] for item in content.split("<#")]
+        user_mentions = [item.split('>')[0] for item in content.split("<@")] if len(content.split("<@")) > 1 else []
+        channel_mentions = [item.split('>')[0] for item in content.split("<#")] if len(content.split("<#")) > 1 else []
         emoji_mentions = [
                              item.split('>')[0].split(':')[1] for item in content.split("<:")
-                         ] + [
+                         ] if len(content.split("<:")) > 1 else [] + [
                              item.split('>')[0].split(':')[1] for item in content.split("<a:")
-                         ]
+                         ] if len(content.split("<a:")) > 1 else []
 
         for user_mention in user_mentions:
             # Check if this is a role mention
             if user_mention.startswith('&'):
                 continue
 
-            user = self.bot.get_user(int(user_mention))
-            content.replace(f"<@{user_mention}>", f"@{user.global_name or user.name}")
+            try:
+                user = self.bot.get_user(int(user_mention))
+            except ValueError:
+                # This is not a valid snowflake
+                continue
+
+            content = content.replace(f"<@{user_mention}>", f"@{user.global_name or user.name}")
 
         for channel_mention in channel_mentions:
-            channel = self.bot.get_channel(int(channel_mention))
-            content.replace(f"<#{channel_mention}>", f"#{channel.name}")
+            try:
+                channel = self.bot.get_channel(int(channel_mention))
+            except ValueError:
+                # This is not a valid snowflake
+                continue
+
+            content = content.replace(f"<#{channel_mention}>", f"#{channel.name}")
 
         for emoji_mention in emoji_mentions:
-            emoji = self.bot.get_emoji(int(emoji_mention))
-            content.replace(
+            try:
+                emoji = self.bot.get_emoji(int(emoji_mention))
+            except ValueError:
+                # This is not a valid snowflake
+                continue
+
+            content = content.replace(
                 f"<a:{emoji.name}:{emoji_mention}>" if emoji.animated else f"<:{emoji.name}:{emoji_mention}>",
                 f":{emoji.name}:"
             )
