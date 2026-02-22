@@ -38,6 +38,15 @@ class BeaconMessageContent:
     def replies(self) -> list['BeaconMessage']:
         return self._replies
 
+    def add_block(self, block_id: str, block: beacon_content.BeaconContentBlock):
+        if block_id in self._blocks:
+            raise ValueError("Block already in blocks")
+
+        self._blocks.update({block_id: block})
+
+    def remove_block(self, block_id):
+        self._blocks.pop(block_id)
+
     def to_plaintext(self) -> str:
         components: list = []
         for block in self._blocks:
@@ -62,12 +71,13 @@ class BeaconMessageGroup:
     This is to be used to store bridged messages in the cache."""
 
     def __init__(self, group_id: str, author: beacon_user.BeaconUser | str, space_id: str,
-                 messages: list['BeaconMessage']):
+                 messages: list['BeaconMessage'], replies: list[str]):
         self._id: str = group_id
         self._author: beacon_user.BeaconUser | None = author if type(author) is beacon_user.BeaconUser else None
         self._author_id: str | None = author if type(author) is str else None
         self._space_id: str = space_id
         self._messages: dict[str, BeaconMessage] = {}
+        self._replies: list[str] = []
 
         for message in messages:
             self._messages.update({message.id: message})
@@ -83,6 +93,14 @@ class BeaconMessageGroup:
     @property
     def author_id(self) -> str:
         return self._author.id if self._author else self._author_id
+
+    @property
+    def messages(self) -> dict:
+        return self._messages
+
+    @property
+    def replies(self) -> list:
+        return self._replies
 
     def to_dict(self) -> dict:
         data = {

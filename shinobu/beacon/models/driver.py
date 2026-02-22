@@ -103,7 +103,7 @@ class BeaconDriver:
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, replies: list[beacon_message.BeaconMessage],
-                   send_as: beacon_user.BeaconUser | None = None, webhook: beacon_webhook.BeaconWebhook | None = None
+                   send_as: beacon_user.BeaconUser | None = None, webhook_id: str | None = None
                    ) -> beacon_message.BeaconMessage:
         """Sends a message to a given destination."""
         raise BeaconDriverUnsupported()
@@ -149,6 +149,10 @@ class BeaconDriver:
     def supports_async(self) -> bool:
         """Whether the driver supports concurrent execution via asyncio."""
         return self._supports_async
+
+    @property
+    def supports_agegate(self) -> bool:
+        return self._supports_agegate
 
     @property
     def file_count_limit(self) -> int:

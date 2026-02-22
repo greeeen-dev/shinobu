@@ -134,7 +134,7 @@ class BeaconSpace:
     def __init__(self, space_id: str, space_name: str, space_emoji: str | None = None, members: list | None = None,
                  invites: list | None = None, bans: list | None = None, private: bool = False, nsfw: bool = False,
                  relay_deletes: bool = True, relay_edits: bool = True, relay_large_attachments: bool = True,
-                 filters: list | None = None):
+                 filters: list | None = None, filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
         self._emoji: str = space_emoji
@@ -149,6 +149,7 @@ class BeaconSpace:
         self._edits: bool = relay_edits
         self._attachments_url = relay_large_attachments
         self._filters: list = filters or []
+        self._filter_configs: dict = filter_configs or {}
 
     @property
     def id(self) -> str:
@@ -197,6 +198,10 @@ class BeaconSpace:
     @property
     def filters(self) -> list:
         return self._filters
+
+    @property
+    def filter_configs(self) -> dict:
+        return self._filter_configs
 
     def use_invite(self, invite: BeaconSpaceInvite):
         pass

@@ -24,6 +24,7 @@ class BeaconMessageCache:
         self.__wrapper: fine_grained.FineGrainedSecureFiles = wrapper
         self._cache_limit = cache_limit
         self._data: dict[str, beacon_message.BeaconMessage] = {}
+        self._data_groups: dict[str, beacon_message.BeaconMessageGroup] = {}
 
     @property
     def cache_limit(self) -> int:
@@ -33,31 +34,34 @@ class BeaconMessageCache:
     def messages(self) -> int:
         return len(self._data.keys())
 
-    def add_message(self, message: beacon_message.BeaconMessage):
-        if message.id in self._data.keys():
+    def add_message(self, message: beacon_message.BeaconMessage | beacon_message.BeaconMessageGroup):
+        target_dict = self._data_groups if type(message) is beacon_message.BeaconMessageGroup else self._data
+
+        if message.id in target_dict.keys():
             raise ValueError("Message already cached")
 
-        if len(self._data.keys()) > self.cache_limit:
-            self._data.pop(next(iter(self._data)))
+        if len(target_dict.keys()) > self.cache_limit:
+            target_dict.pop(next(iter(target_dict)))
 
-        self._data.update({message.id: message})
+        target_dict.update({message.id: message})
 
     def get_message(self, message_id: str) -> beacon_message.BeaconMessage | None:
         """Gets a message from the cache."""
+        return self._data.get(message_id)
 
-        # Strategy 1: direct fetch from dict
-        message = self._data.get(message_id)
+    def get_message_group(self, group_id: str) -> beacon_message.BeaconMessageGroup | None:
+        """Gets a message from the cache."""
+        return self._data_groups.get(group_id)
 
-        if message:
-            return message
+    def get_group_from_message(self, message_id: str) -> beacon_message.BeaconMessageGroup | None:
+        """Gets a message group from the cache."""
 
-        # Strategy 2: fetch from message object
-        results = [entry for _, entry in self._data.items() if entry.id == message_id]
+        for _, group in self._data_groups.items():
+            matches = [message for message in group.messages if message.id == message_id]
 
-        if len(results) > 0:
-            return results[0]
+            if len(matches) > 0:
+                return group
 
-        # Otherwise, return nothing
         return None
 
     def save(self):

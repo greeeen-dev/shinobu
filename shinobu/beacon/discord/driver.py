@@ -512,9 +512,9 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, replies: list[beacon_message.BeaconMessage],
-                   send_as: beacon_user.BeaconUser | None = None, webhook: beacon_webhook.BeaconWebhook | None = None):
+                   send_as: beacon_user.BeaconUser | None = None, webhook_id: str | None = None):
         # Get message options
-        send_as_webhook: bool = webhook is not None
+        send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None
 
         # Run sanity checks
@@ -524,13 +524,11 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         # Get webhook (if needed)
         webhook_obj: discord.Webhook | None = None
         if send_as_webhook:
-            send_as_webhook = True
-
             # Ensure webhook is in cache
-            await self.getch_webhook(webhook.id)
+            await self.getch_webhook(webhook_id)
 
             # Get webhook from cache
-            webhook_obj = self._webhooks.get_webhook(webhook.id)
+            webhook_obj = self._webhooks.get_webhook(webhook_id)
 
         # Get user name and avatar
         custom_name: str | None = None
@@ -545,7 +543,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         )
 
         # Send the message!
-        if webhook:
+        if webhook_id:
             target: discord.TextChannel | discord.abc.Messageable = webhook_obj.channel
             message = await webhook_obj.send(
                 content=discord_content.content,
@@ -581,7 +579,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             content=discord_content.raw_content,
             attachments=len(discord_content.files),
             replies=content.replies,
-            webhook_id=webhook.id if webhook else None
+            webhook_id=webhook_id if webhook_obj else None
         )
 
     async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent):
