@@ -22,12 +22,15 @@ from shinobu.beacon.models import (content as beacon_content, abc, user as beaco
 
 class BeaconMessageContent:
     def __init__(self, original_id: str, original_channel_id: str, blocks: dict[str, beacon_content.BeaconContentBlock],
-                 files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None):
+                 files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None,
+                 reply_content: str | None = None, reply_attachments: int | None = None):
         self._original_id: str = original_id
         self._original_channel_id: str = original_channel_id
         self._blocks: dict[str, beacon_content.BeaconContentBlock] = blocks
         self._files: list[beacon_file.BeaconFile] = files or []
         self._replies: list[BeaconMessageGroup] = replies or []
+        self._reply_content: str | None = reply_content
+        self._reply_attachments: int = reply_attachments or 0
 
     @property
     def original_id(self) -> str:
@@ -48,6 +51,14 @@ class BeaconMessageContent:
     @property
     def replies(self) -> list['BeaconMessageGroup']:
         return self._replies
+
+    @property
+    def reply_content(self) -> str | None:
+        return self._reply_content
+
+    @property
+    def reply_attachments(self) -> int:
+        return self._reply_attachments
 
     def add_block(self, block_id: str, block: beacon_content.BeaconContentBlock):
         if block_id in self._blocks:

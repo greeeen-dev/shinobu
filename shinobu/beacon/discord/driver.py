@@ -314,8 +314,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             reply_content: str | None = None
 
             # Get message content
-            if reply_message.content:
-                reply_content = reply_message.content
+            if content.reply_content:
+                reply_content = content.reply_content
             else:
                 # Fetch message
                 channel = self.bot.get_channel(int(reply_message.channel.id))
@@ -343,6 +343,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 label=f'Jump to message',
                 url=reply_url
             )
+
             reply_text: discord.ui.TextDisplay = discord.ui.TextDisplay(
                 f"\U000021AA\U0000FE0F **Replying to @{reply_author}**"
             )
@@ -355,6 +356,10 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
                 reply_text= discord.ui.TextDisplay(
                     f"\U000021AA\U0000FE0F **Replying to @{reply_author}** - {reply_content}"
+                )
+            elif content.reply_attachments > 0:
+                reply_text = discord.ui.TextDisplay(
+                    f"\U000021AA\U0000FE0F **Replying to @{reply_author}** \U0001F5BC\U0000FE0F"
                 )
 
             # Create reply action row

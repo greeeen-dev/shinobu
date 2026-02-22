@@ -94,26 +94,35 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
         # Add reply if it exists
         replies: list[beacon_message.BeaconMessageGroup] = []
+        reply_content: str | None = None
+        reply_attachments: int = 0
+
         if message.reference:
             replies = [self._beacon.messages.get_group_from_message(
                 str(message.reference.message_id)
             )]
 
-            # If the message is cached, overwrite its content
-            # If the Discord message object isn't cached, the driver can fetch that for us later
-            reply_message: beacon_message.BeaconMessage | None = self._beacon.messages.get_message(
-                str(message.reference.message_id)
-            )
-            if reply_message and message.reference.cached_message:
+            reply_message: discord.Message | None = None
+
+            if message.reference.cached_message:
+                reply_message = message.reference.cached_message
+            else:
+                try:
+                    reply_message = await message.channel.fetch_message(message.reference.message_id)
+                except discord.HTTPException:
+                    pass
+
+            if reply_message:
                 uses_components_v2: bool = discord.MessageFlags.is_components_v2 in message.reference.cached_message.flags
 
                 if uses_components_v2:
                     # Get component 300 (text display)
                     component: discord.TextDisplay | None = message.reference.cached_message.get_component(300)
-                    if component:
-                        reply_message.edit_content(component.content)
+                    reply_content = component.content
                 else:
-                    reply_message.edit_content(message.content)
+                    reply_content = reply_message.content
+
+                reply_attachments = len(message.attachments)
 
         # Get attachments
         tasks = []
@@ -140,7 +149,9 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             original_channel_id=str(message.channel.id),
             blocks=blocks,
             files=files,
-            replies=replies
+            replies=replies,
+            reply_content=reply_content,
+            reply_attachments=reply_attachments
         )
 
         return content
