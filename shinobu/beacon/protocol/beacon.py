@@ -72,6 +72,11 @@ class Beacon:
         return self._messages
 
     @staticmethod
+    def bacon():
+        """Bacon because I keep confusing beacon and bacon"""
+        print("Bacon 🥓")
+
+    @staticmethod
     async def _strategy_sequential(callbacks: list) -> list:
         """Sequentially executes asynchronous callbacks."""
 
