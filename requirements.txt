@@ -5,3 +5,6 @@ ujson
 orjson
 tomli-w
 aiomultiprocess
+jellyfish
+tld
+better-profanity

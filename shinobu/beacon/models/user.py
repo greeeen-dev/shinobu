@@ -22,10 +22,11 @@ class BeaconUser(messageable.BeaconMessageable):
     """A class representing users."""
 
     def __init__(self, user_id: str, platform: str, name: str, display_name: str | None = None,
-                 avatar_url: str | None = None):
+                 avatar_url: str | None = None, bot: bool = False):
         super().__init__(user_id, platform, name)
         self._display_name: str | None = display_name
         self._avatar: str | None = avatar_url
+        self._bot: bool = bot
 
     @property
     def display_name(self) -> str:
@@ -34,3 +35,7 @@ class BeaconUser(messageable.BeaconMessageable):
     @property
     def avatar_url(self) -> str | None:
         return self._avatar
+
+    @property
+    def bot(self) -> bool:
+        return self._bot

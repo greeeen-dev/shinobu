@@ -16,7 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from shinobu.beacon.models import message as beacon_message
+from shinobu.beacon.models import message as beacon_message, user as beacon_user
 
 class BeaconMissingFilter(Exception):
     pass
@@ -123,6 +123,7 @@ class BeaconFilter:
 
         self.__configs.update({config_id: config})
 
-    def check(self, message: beacon_message.BeaconMessageContent, data) -> BeaconFilterResult:
+    def check(self, author: beacon_user.BeaconUser, message: beacon_message.BeaconMessageContent,
+              webhook_id: str | None = None, data: dict | None = None) -> BeaconFilterResult:
         """Checks if a content is allowed or not allowed by the filter."""
         raise BeaconMissingFilter()

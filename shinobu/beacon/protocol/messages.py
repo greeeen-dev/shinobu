@@ -69,4 +69,4 @@ class BeaconMessageCache:
             converted.update({message: self._data[message].to_dict()})
 
         # Save data as JSON
-        self.__wrapper.save_json("bridge", self._data)
+        self.__wrapper.save_json("cache", self._data)

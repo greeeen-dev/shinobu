@@ -27,3 +27,7 @@ that's also flexible and ready for the demands of tomorrow.
 ### And the stuff reserved for later
 - [ ] Spacebar support
 - [ ] Matrix support
+
+## Attribution
+This is just a rough list of attributions, I'll do a proper one as I work on the project.
+- Stole code from https://github.com/UnifierHQ/unifier (mainly my own code)

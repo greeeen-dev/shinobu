@@ -22,8 +22,8 @@ class BeaconMember(user.BeaconUser):
     """A class representing server members."""
 
     def __init__(self, user_id: str, platform: str, name: str, server: beacon_server.BeaconServer,
-                 display_name: str | None = None, avatar_url: str | None = None):
-        super().__init__(user_id, platform, name, display_name=display_name, avatar_url=avatar_url)
+                 display_name: str | None = None, avatar_url: str | None = None, bot: bool = False):
+        super().__init__(user_id, platform, name, display_name=display_name, avatar_url=avatar_url, bot=bot)
         self._server: beacon_server.BeaconServer = server
 
     @property

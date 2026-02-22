@@ -19,14 +19,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import sys
 import asyncio
 import aiomultiprocess
+from enum import Enum
 from shinobu.beacon.protocol import drivers as beacon_drivers, spaces as beacon_spaces, messages as beacon_messages
-from shinobu.beacon.models import space as beacon_space, message as beacon_message, content as beacon_content
+from shinobu.beacon.models import (space as beacon_space, message as beacon_message, content as beacon_content,
+                                   user as beacon_user)
 from shinobu.runtime.secrets import fine_grained
 
 # Set start method to fork
 # This is not supported on Windows
 if sys.platform != "win32":
     aiomultiprocess.set_start_method("fork")
+
+class BeaconMessageBlockedReason(Enum):
+    bridge_paused = 1
+    filter_blocked = 2
 
 class Beacon:
     def __init__(self, files_wrapper: fine_grained.FineGrainedSecureFiles, enable_multi: bool = True):
@@ -37,6 +43,9 @@ class Beacon:
         self._drivers: beacon_drivers.BeaconDriverManager = beacon_drivers.BeaconDriverManager()
         self._spaces: beacon_spaces.BeaconSpaceManager = beacon_spaces.BeaconSpaceManager()
         self._messages: beacon_messages.BeaconMessageCache = beacon_messages.BeaconMessageCache(self.__wrapper)
+
+        # Get data
+        self._data: dict = self.__wrapper.read_json("bridge")
 
         # Create aiomultiprocess pool if available and enabled
         self._pool: aiomultiprocess.Pool | None = None
@@ -90,6 +99,41 @@ class Beacon:
         # Run tasks in pool (and return result)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
-    async def send(self, space: beacon_space.BeaconSpace,
+    async def _can_send(self, author: beacon_user.BeaconUser, space: beacon_space.BeaconSpace,
+                        content: beacon_message.BeaconMessageContent) -> BeaconMessageBlockedReason | None:
+        # Get bridge paused data
+        bridge_paused: dict = self._data.get("bridge_paused")
+
+        # Does the author have their bridge paused?
+        if author.id in bridge_paused:
+            # Get bridge pause data
+            bridge_paused_data: dict = bridge_paused[author.id]
+            bridge_paused_inclusive: bool = bridge_paused_data.get("inclusive")
+            bridge_paused_entries: list = bridge_paused_data.get("entries", [])
+
+            # Check if there's any prefix and suffix matches
+            has_match: bool = False
+            content_text: str = content.to_plaintext()
+            for entry in bridge_paused_entries:
+                if (
+                        content_text.startswith(entry["prefix"]) and
+                        content_text.endswith(entry["suffix"]) and
+                        bridge_paused_inclusive
+                ):
+                    # There's a prefix and suffix match here
+                    return BeaconMessageBlockedReason.bridge_paused
+                elif not bridge_paused_inclusive:
+                    has_match = True
+                    break
+
+            if not has_match and not bridge_paused_inclusive:
+                return BeaconMessageBlockedReason.bridge_paused
+
+        # Run filter scans
+
+
+    async def send(self, author: beacon_user.BeaconUser, space: beacon_space.BeaconSpace,
                    content: beacon_message.BeaconMessageContent) -> beacon_message.BeaconMessageGroup:
+        """Sends a message to a Space."""
+
         pass

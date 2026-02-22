@@ -8,9 +8,9 @@
     "shinobu.beacon.cogs.backend"
   ],
   "intents": {
-    "entitlements_files": "Entitlement needed for beacon.json to store bridge data."
+    "entitlements_files": "Entitlement needed for beacon and cache to store bridge data."
   },
   "entitlements_files": {
-    "shinobu.beacon.cogs.backend": ["beacon"]
+    "shinobu.beacon.cogs.backend": ["beacon", "cache"]
   }
 }
