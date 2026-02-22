@@ -39,15 +39,15 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         )
 
         # Get Beacon
-        self.beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
+        self._beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
 
         # Check if driver is already initialized
-        if "discord" in self.beacon.drivers.platforms:
+        if "discord" in self._beacon.drivers.platforms:
             return
 
         # Register driver
-        self.beacon.drivers.register_driver("discord", discord_driver.DiscordDriver(
-            self.bot, self.beacon.messages
+        self._beacon.drivers.register_driver("discord", discord_driver.DiscordDriver(
+            self.bot, self._beacon.messages
         ))
 
     async def _to_beacon_content(self, message: discord.Message) -> beacon_message.BeaconMessageContent:
@@ -95,9 +95,9 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         # Add reply if it exists
         replies: list[beacon_message.BeaconMessageGroup] = []
         if message.reference:
-            reply_group: beacon_message.BeaconMessageGroup = self._beacon.messages.get_group_from_message(
+            replies = [self._beacon.messages.get_group_from_message(
                 str(message.reference.message_id)
-            )
+            )]
 
             # If the message is cached, overwrite its content
             # If the Discord message object isn't cached, the driver can fetch that for us later
@@ -157,7 +157,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        origin_driver: beacon_driver.BeaconDriver = self.beacon.drivers.get_driver("discord")
+        origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
         if message.author.id == self.bot.user.id:
             # Do not self-bridge
@@ -192,14 +192,14 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
 
         # Get Space
-        space: beacon_space.BeaconSpace = self.beacon.spaces.get_space_for_channel(channel)
+        space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
 
         if not space:
             # We can't bridge
             return
 
         # Run preliminary checks
-        preliminary_block: beacon.BeaconMessageBlockedReason | None = await self.beacon.can_send(
+        preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
             author=author,
             space=space,
             content=content,
@@ -211,7 +211,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             return
 
         # Send message!
-        await self.beacon.send(
+        await self._beacon.send(
             author=author,
             space=space,
             content=content
