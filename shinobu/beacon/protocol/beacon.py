@@ -51,7 +51,7 @@ class Beacon:
         self._filters: beacon_filters.BeaconFilterManager = beacon_filters.BeaconFilterManager()
 
         # Get data
-        self._data: dict = self.__wrapper.read_json("bridge")
+        self._data: dict = self.__wrapper.read_json("beacon")
 
         # Create aiomultiprocess pool if available and enabled
         self._pool: aiomultiprocess.Pool | None = None

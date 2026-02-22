@@ -36,7 +36,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         self.beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
 
         # Check if driver is already initialized
-        if "discord" in self.beacon.drivers:
+        if "discord" in self.beacon.drivers.platforms:
             return
 
         # Register driver

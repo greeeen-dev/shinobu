@@ -318,7 +318,7 @@ class ActualFineGrainedSecureFiles(fine_grained.FineGrainedSecureFiles):
         return secrets_authority.read(self, filename)
 
     def read_json(self, filename: str) -> dict:
-        return orjson.loads(secrets_authority.read(self, filename))
+        return orjson.loads(secrets_authority.read(self, filename) or "{}")
 
     def save(self, filename: str, data: str):
         # This operation can take a very long time (at least a few hundred milliseconds)!
