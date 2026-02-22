@@ -16,14 +16,41 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import os
 import sys
 import traceback
 import getpass
-from shinobu.runtime.secrets import manager
+import ujson as json
+from ujson import JSONDecodeError
+from shinobu.runtime.secrets import manager, encryptor
 
 class ShinobuSecretsCLI:
-    def __init__(self, tokenstore: manager.TokenStore):
+    def __init__(self, tokenstore: manager.TokenStore, raw_encryptor: manager.RawEncryptor):
         self._tokenstore: manager.TokenStore = tokenstore
+        self._encryptor: manager.RawEncryptor = raw_encryptor
+        self._files: list[str] = []
+
+        # Load plugins
+        self.load_plugin("shinobu/manifest.json")
+
+        if os.path.exists("plugins"):
+            for plugin in os.listdir("plugins"):
+                if not plugin.endswith('.json'):
+                    continue
+
+                try:
+                    self.load_plugin(plugin)
+                except (FileNotFoundError, JSONDecodeError):
+                    continue
+
+    def load_plugin(self, filename: str):
+        with open(filename, 'r') as file:
+            data = json.load(file)
+
+        entitlements_files: dict[str, list[str]] = data.get("entitlements_files")
+
+        for _, files in entitlements_files.items():
+            self._files.extend(files)
 
     @property
     def commands(self) -> dict:
@@ -34,7 +61,8 @@ class ShinobuSecretsCLI:
             'replace-token': self.replace_token,
             'delete-token': self.delete_token,
             'list-tokens': self.list_tokens,
-            'reencrypt-tokens': self.reencrypt_tokens,
+            'list-files': self.list_files,
+            'reencrypt': self.reencrypt,
             'help': self.command_help,
             'exit': lambda: sys.exit(0)
         }
@@ -124,7 +152,14 @@ class ShinobuSecretsCLI:
             token = self._tokenstore.tokens[index]
             print(f'\x1b[36m{index + 1}. {token}\x1b[0m')
 
-    def reencrypt_tokens(self):
+    def list_files(self):
+        print(f'\x1b[36;1mYou have {len(self._files)} files registered. These are managed automatically.\x1b[0m')
+
+        for index in range(len(self._files)):
+            file = self._files[index]
+            print(f'\x1b[36m{index + 1}. {file}\x1b[0m')
+
+    def reencrypt(self):
         current_password = getpass.getpass('Current encryption password: ')
         password = getpass.getpass('New encryption password: ')
         confirm_password = getpass.getpass('Confirm encryption password: ')
@@ -135,8 +170,9 @@ class ShinobuSecretsCLI:
 
         del confirm_password
 
-        print('\x1b[37;41;1mWARNING: YOUR TOKENS WILL BE RE-ENCRYPTED!\x1b[0m')
-        print('\x1b[33;1mYou will need to use your new encryption password to start Unifier.\x1b[0m')
+        print('\x1b[37;41;1mWARNING: YOUR TOKENS AND SECURE FILES WILL BE RE-ENCRYPTED!\x1b[0m')
+        print('\x1b[33;1mYou will need to use your new encryption password to start Shinobu.\x1b[0m')
+        print('\x1b[33;1mIt is recommended to back up your tokens and files first to prevent data loss.\x1b[0m')
         print('\x1b[33;1mThis process is irreversible. Once it\'s done, there\'s no going back!\x1b[0m')
         print()
         print('\x1b[33;1mProceed anyways? (y/n)\x1b[0m')
@@ -150,10 +186,35 @@ class ShinobuSecretsCLI:
             return
 
         try:
-            self._tokenstore.reencrypt(current_password, password)
+            # Test password
+            self._tokenstore.test_decrypt(current_password)
         except ValueError:
             print('\x1b[31;1mInvalid password. Your current encryption password is needed to re-encrypt tokens.\x1b[0m')
             return
+
+        # Re-encrypt tokens
+        self._tokenstore.reencrypt(current_password, password)
+
+        # Re-encrypt files
+        new_encryptor: manager.RawEncryptor = manager.RawEncryptor(password)
+
+        for file in self._files:
+            try:
+                with open(f'data/{file}.json', 'r') as datafile:
+                    data: dict = json.load(datafile)
+            except (FileNotFoundError, JSONDecodeError):
+                continue
+
+            encrypted_data: encryptor.GCMEncryptedData = encryptor.GCMEncryptedData.from_dict(data)
+            decrypted_data: str = self._encryptor.decrypt(encrypted_data)
+            new_encrypted_data: encryptor.GCMEncryptedData = new_encryptor.encrypt(decrypted_data)
+            new_data: dict = new_encrypted_data.to_dict()
+
+            with open(f'data/{file}.json', 'w+') as datafile:
+                json.dump(new_data, datafile)
+
+        # Replace old raw encryptor
+        self._encryptor = new_encryptor
 
         print('\x1b[36;1mTokens have been re-encrypted successfully.\x1b[0m')
 

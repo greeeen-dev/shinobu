@@ -24,7 +24,6 @@ import ujson as json
 import orjson
 import getpass
 import discord
-import threading
 from discord.ext import commands
 from dotenv import load_dotenv
 from shinobu.runtime import runtime
@@ -480,12 +479,9 @@ def start_bot():
 def start_secrets_cli():
     """Launches the Secrets Manager CLI."""
     global password
-    cli_tokenstore = manager.TokenStore(
-        password,
-        debug=False,
-        read_only=False
-    )
-    cli: secrets_cli.ShinobuSecretsCLI = secrets_cli.ShinobuSecretsCLI(cli_tokenstore)
+    cli_tokenstore = manager.TokenStore(password, debug=False, read_only=False)
+    cli_encryptor = manager.RawEncryptor(password)
+    cli: secrets_cli.ShinobuSecretsCLI = secrets_cli.ShinobuSecretsCLI(cli_tokenstore, cli_encryptor)
     cli.run()
 
 # Start Shinobu Runtime
