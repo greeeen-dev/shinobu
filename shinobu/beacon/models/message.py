@@ -51,10 +51,6 @@ class BeaconMessageContent:
 
         return "\n".join(components)
 
-    @property
-    def replies(self) -> list:
-        return self._replies
-
 class BeaconLegacyMessageContent:
     def __init__(self):
         self._content: str = ""
@@ -113,7 +109,7 @@ class BeaconMessage(abc.BeaconABC):
         self._content: str | dict | None = content
         self._attachments: int = attachments
         self._replies: list[BeaconMessage] = replies or []
-        self._webhook_id: str | None = None
+        self._webhook_id: str | None = webhook_id
 
     @property
     def author(self) -> beacon_user.BeaconUser | beacon_webhook.BeaconWebhook:
@@ -152,7 +148,7 @@ class BeaconMessage(abc.BeaconABC):
             "author_id": self.author.id,
             "server_id": self.server.id if self.server else None,
             "channel_id": self.channel.id if self.channel else None,
-            "webhook_id": self.webhook.id if self.webhook else None
+            "webhook_id": self.webhook_id
         }
 
         converted.update({"replies": [reply.id for reply in self._replies]})
