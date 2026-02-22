@@ -4,3 +4,4 @@ pycryptodome
 ujson
 orjson
 tomli-w
+aiomultiprocess

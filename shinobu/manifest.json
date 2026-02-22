@@ -3,7 +3,10 @@
   "description": "Modules packaged with Shinobu",
   "version": "0.1.0",
   "releaseId": 0,
-  "modules": [],
+  "requiredId": 0,
+  "modules": [
+    "shinobu.beacon.cogs.backend"
+  ],
   "intents": {
     "entitlements_files": "Entitlement needed for beacon.json to store bridge data."
   },

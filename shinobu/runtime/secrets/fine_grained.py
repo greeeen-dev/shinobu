@@ -26,19 +26,24 @@ class FineGrainedSecrets(FineGrainedWrapper):
     """Fine-grained secrets."""
 
     def retrieve(self, secret: str) -> str:
+        """Retrieves an encrypted secret."""
         return ""
 
 class FineGrainedSecureFiles(FineGrainedWrapper):
     """Fine-grained secure files."""
 
     def read(self, filename: str) -> str:
+        """Reads a string from a secure file."""
         return ""
 
     def read_json(self, filename: str) -> dict:
+        """Reads a dict object from a secure file."""
         return {}
 
     def save(self, filename: str, data: str):
+        """Saves a string to a secure file."""
         return
 
     def save_json(self, filename: str, data: dict):
+        """Saves a dict object to a secure file."""
         return

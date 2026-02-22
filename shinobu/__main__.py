@@ -24,6 +24,7 @@ import ujson as json
 import orjson
 import getpass
 import discord
+import threading
 from discord.ext import commands
 from dotenv import load_dotenv
 from shinobu.runtime import runtime
@@ -310,6 +311,9 @@ class ActualFineGrainedSecureFiles(fine_grained.FineGrainedSecureFiles):
     """The parent class has no idea how to retrieve secrets, so we use a child class to give
     it that ability via overwriting."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def read(self, filename: str) -> str:
         return secrets_authority.read(self, filename)
 
@@ -317,6 +321,10 @@ class ActualFineGrainedSecureFiles(fine_grained.FineGrainedSecureFiles):
         return orjson.loads(secrets_authority.read(self, filename))
 
     def save(self, filename: str, data: str):
+        # This operation can take a very long time (at least a few hundred milliseconds)!
+        # It is not recommended to thread this task, consider running it in an asyncio
+        # loop executor instead if you need the function to be non-blocking.
+
         secrets_authority.save(self, filename, data)
 
     def save_json(self, filename: str, data: dict):

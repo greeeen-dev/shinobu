@@ -16,26 +16,28 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from shinobu.beacon.models import abc
+from shinobu.beacon.models import space as beacon_space
 
-class BeaconServer(abc.BeaconABC):
-    """A class representing a server."""
+class BeaconSpaceManager:
+    def __init__(self):
+        self._spaces: dict[str, beacon_space.BeaconSpace] = {}
 
-    def __init__(self, server_id: str, platform: str, name: str, filesize_limit: int | None = None):
-        super().__init__(server_id, platform)
-        self._name: str = name
-        self._filesize_limit: int | None = filesize_limit
+    def add_spaces(self, spaces: list[beacon_space.BeaconSpace]):
+        for space in spaces:
+            if space.id in self._spaces:
+                continue
 
-    @property
-    def name(self) -> str:
-        return self._name
+            self._spaces.update({space.id: space})
 
-    @property
-    def filesize_limit(self) -> int | None:
-        return self._filesize_limit
+    def get_space(self, space_id: str) -> beacon_space.BeaconSpace:
+        return self._spaces.get(space_id)
 
-    def __eq__(self, other):
-        if not isinstance(other, BeaconServer):
-            return False
+    def delete_space(self, space_id: str):
+        self._spaces.pop(space_id)
 
-        return self.id == other.id
+    def to_dict(self) -> dict:
+        data = {}
+        for space, space_obj in self._spaces.items():
+            data[space] = space_obj.to_dict()
+
+        return data

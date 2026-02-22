@@ -16,20 +16,22 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from shinobu.beacon.models import user, server as beacon_server
+class BeaconFile:
+    """A class representing message files."""
 
-class BeaconMember(user.BeaconUser):
-    """A class representing server members."""
-
-    def __init__(self, user_id: str, platform: str, name: str, server: beacon_server.BeaconServer,
-                 display_name: str | None = None, avatar_url: str | None = None):
-        super().__init__(user_id, platform, name, display_name=display_name, avatar_url=avatar_url)
-        self._server: beacon_server.BeaconServer = server
+    def __init__(self, data: bytes, filename: str | None = None, spoiler: bool = False):
+        self._data: bytes = data
+        self._filename: str | None = filename
+        self._spoiler: bool = spoiler
 
     @property
-    def server(self) -> beacon_server.BeaconServer:
-        return self._server
+    def data(self) -> bytes:
+        return self._data
 
     @property
-    def server_id(self) -> str:
-        return self._server.id
+    def filename(self) -> str | None:
+        return self._filename
+
+    @property
+    def spoiler(self) -> bool:
+        return self._spoiler
