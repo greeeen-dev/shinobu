@@ -40,15 +40,18 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
         # Get Beacon
         self._beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
+        self._driver: discord_driver.DiscordDriver | beacon_driver.BeaconDriver | None = None
 
         # Check if driver is already initialized
         if "discord" in self._beacon.drivers.platforms:
+            self._driver = self._beacon.drivers.get_driver("discord")
             return
 
+        # Create driver
+        self._driver = discord_driver.DiscordDriver(self.bot, self._beacon.messages)
+
         # Register driver
-        self._beacon.drivers.register_driver("discord", discord_driver.DiscordDriver(
-            self.bot, self._beacon.messages
-        ))
+        self._beacon.drivers.register_driver("discord", self._driver)
 
     async def _to_beacon_content(self, message: discord.Message) -> beacon_message.BeaconMessageContent:
         # Create text content block
@@ -150,7 +153,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             blocks=blocks,
             files=files,
             replies=replies,
-            reply_content=reply_content,
+            reply_content=self._driver.sanitize_outbound(reply_content),
             reply_attachments=reply_attachments
         )
 
