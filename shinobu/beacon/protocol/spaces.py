@@ -16,21 +16,34 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from shinobu.beacon.models import space as beacon_space
+from shinobu.beacon.models import space as beacon_space, channel as beacon_channel
 
 class BeaconSpaceManager:
     def __init__(self):
         self._spaces: dict[str, beacon_space.BeaconSpace] = {}
 
+    def add_space(self, space: beacon_space.BeaconSpace):
+        if space.id in self._spaces:
+            return
+
+        self._spaces.update({space.id: space})
+
     def add_spaces(self, spaces: list[beacon_space.BeaconSpace]):
         for space in spaces:
-            if space.id in self._spaces:
-                continue
+            self.add_space(space)
 
-            self._spaces.update({space.id: space})
-
-    def get_space(self, space_id: str) -> beacon_space.BeaconSpace:
+    def get_space(self, space_id: str) -> beacon_space.BeaconSpace | None:
         return self._spaces.get(space_id)
+
+    def get_space_for_channel(self, channel: beacon_channel.BeaconChannel) -> beacon_space.BeaconSpace | None:
+        for space_id in self._spaces:
+            space = self._spaces[space_id]
+            matches = [member for member in space.members if member.channel_id == channel.id]
+
+            if len(matches) > 0:
+                return space
+
+        return None
 
     def delete_space(self, space_id: str):
         self._spaces.pop(space_id)

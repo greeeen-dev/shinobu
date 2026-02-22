@@ -102,9 +102,8 @@ class BeaconDriver:
         raise BeaconDriverUnsupported()
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
-                   content: beacon_message.BeaconMessageContent, replies: list[beacon_message.BeaconMessage],
-                   send_as: beacon_user.BeaconUser | None = None, webhook_id: str | None = None
-                   ) -> beacon_message.BeaconMessage:
+                   content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
+                   webhook_id: str | None = None) -> beacon_message.BeaconMessage:
         """Sends a message to a given destination."""
         raise BeaconDriverUnsupported()
 
@@ -157,6 +156,10 @@ class BeaconDriver:
     @property
     def file_count_limit(self) -> int:
         return self._file_count_limit
+
+    @property
+    def webhooks(self) -> BeaconDriverWebhookCache:
+        return self._webhooks
 
     def get_member(self, server: beacon_server.BeaconServer, member_id: str) -> beacon_member.BeaconMember | None:
         """Gets a member from a server."""

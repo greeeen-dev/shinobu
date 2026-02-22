@@ -21,10 +21,10 @@ from shinobu.beacon.models import (content as beacon_content, abc, user as beaco
 
 class BeaconMessageContent:
     def __init__(self, blocks: dict[str, beacon_content.BeaconContentBlock],
-                 files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessage'] | None = None):
+                 files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None):
         self._blocks: dict[str, beacon_content.BeaconContentBlock] = blocks
         self._files: list[beacon_file.BeaconFile] = files or []
-        self._replies: list[BeaconMessage] = replies or []
+        self._replies: list[BeaconMessageGroup] = replies or []
 
     @property
     def blocks(self) -> dict[str, beacon_content.BeaconContentBlock]:
@@ -35,7 +35,7 @@ class BeaconMessageContent:
         return self._files
 
     @property
-    def replies(self) -> list['BeaconMessage']:
+    def replies(self) -> list['BeaconMessageGroup']:
         return self._replies
 
     def add_block(self, block_id: str, block: beacon_content.BeaconContentBlock):

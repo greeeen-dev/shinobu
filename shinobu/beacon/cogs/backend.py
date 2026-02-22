@@ -30,6 +30,7 @@ class BeaconBackend(shinobu_cog.ShinobuCog):
                 visible_in_help=True
             )
         )
+        self._beacon: beacon.Beacon | None = None
 
     def on_entitlements_issued(self):
         # We will initialize Beacon here
@@ -37,8 +38,8 @@ class BeaconBackend(shinobu_cog.ShinobuCog):
             # Beacon already initialized
             return
 
-        beacon_obj: beacon.Beacon = beacon.Beacon(self.bot, self._shinobu_files)
-        self.bot.shared_objects.add("beacon", beacon_obj)
+        self._beacon = beacon.Beacon(self.bot, self._shinobu_files)
+        self.bot.shared_objects.add("beacon", self._beacon)
 
 def get_cog_type():
     return BeaconBackend

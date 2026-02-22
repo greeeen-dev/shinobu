@@ -512,8 +512,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         return self._to_beacon_webhook(webhook)
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
-                   content: beacon_message.BeaconMessageContent, replies: list[beacon_message.BeaconMessage],
-                   send_as: beacon_user.BeaconUser | None = None, webhook_id: str | None = None):
+                   content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
+                   webhook_id: str | None = None):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None

@@ -6,6 +6,7 @@
   "requiredId": 0,
   "modules": [
     "shinobu.beacon.cogs.backend",
+    "shinobu.beacon.cogs.frontend",
     "shinobu.beacon.discord.parent"
   ],
   "intents": {

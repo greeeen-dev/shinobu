@@ -187,15 +187,14 @@ class Beacon:
 
     async def _send_platform(self, driver: beacon_driver.BeaconDriver, author: beacon_member.BeaconMember,
                              space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
-                             replies: list[beacon_message.BeaconMessage] | None = None, webhook_id: str | None = None
-                             ) -> list[beacon_message.BeaconMessage]:
+                             webhook_id: str | None = None) -> list[beacon_message.BeaconMessage]:
         space_members: list[beacon_space.BeaconSpaceMember] = [
             member for member in space.members if member.platform == driver.platform
         ]
         tasks = []
 
         for member in space_members:
-            tasks.append(driver.send(member.channel, content, replies, author, webhook_id))
+            tasks.append(driver.send(member.channel, content, author, webhook_id))
 
         if driver.supports_multi:
             results: list[beacon_message.BeaconMessage] = await self._strategy_multi(tasks, return_exceptions=True)
@@ -212,8 +211,7 @@ class Beacon:
         return results
 
     async def send(self, author: beacon_member.BeaconMember, space: beacon_space.BeaconSpace,
-                   content: beacon_message.BeaconMessageContent,
-                   replies: list[beacon_message.BeaconMessage] | None = None, webhook_id: str | None = None
+                   content: beacon_message.BeaconMessageContent, webhook_id: str | None = None
                    ) -> beacon_message.BeaconMessageGroup:
         """Sends a message to a Space."""
 
@@ -243,7 +241,7 @@ class Beacon:
         tasks = []
         for platform in self._drivers.platforms:
             driver = self._drivers.get_driver(platform)
-            tasks.append(self._send_platform(driver, author, space, content, replies, webhook_id))
+            tasks.append(self._send_platform(driver, author, space, content, webhook_id))
 
         # Bridge to platforms
         results: list[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=True)
@@ -253,14 +251,10 @@ class Beacon:
         for result in results:
             results_final.extend(result)
 
-        # Convert replies to message groups
+        # Convert replies
         replies_groups: list[str] = []
-        for reply in replies:
-            # Check if there's a message group with this message
-            group: beacon_message.BeaconMessageGroup = self._messages.get_group_from_message(reply.id)
-
-            if group:
-                replies_groups.append(group.id)
+        for reply in content.replies:
+            replies_groups.append(reply.id)
 
         # Create message group
         message_group: beacon_message.BeaconMessageGroup = beacon_message.BeaconMessageGroup(
