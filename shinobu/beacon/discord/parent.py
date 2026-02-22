@@ -101,10 +101,13 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         reply_attachments: int = 0
 
         if message.reference:
-            replies = [self._beacon.messages.get_group_from_message(
+            reply_group: beacon_message.BeaconMessageGroup | None = self._beacon.messages.get_group_from_message(
                 str(message.reference.message_id)
-            )]
+            )
+            if reply_group:
+                replies.append(reply_group)
 
+        if message.reference and len(replies) > 0:
             reply_message: discord.Message | None = None
 
             if message.reference.cached_message:
@@ -120,7 +123,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
                 if uses_components_v2:
                     # Get component 300 (text display)
-                    component: discord.TextDisplay | None = message.reference.cached_message.get_component(300)
+                    component: discord.TextDisplay | None = reply_message.get_component(300)
                     reply_content = component.content
                 else:
                     reply_content = reply_message.content
