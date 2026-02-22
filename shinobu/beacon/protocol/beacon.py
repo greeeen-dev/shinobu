@@ -228,7 +228,9 @@ class Beacon:
 
         # We'll re-fetch the channel just to check for age-gate status updates
         origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(author.platform)
-        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(space_membership.channel_id)
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(
+            space_membership.server, space_membership.channel_id
+        )
 
         if (
                 (space.nsfw and not channel.nsfw) or
