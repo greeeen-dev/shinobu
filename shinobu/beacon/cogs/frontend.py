@@ -52,7 +52,8 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
             space_name=name
         )
         self._beacon.spaces.add_space(new_space)
-        await ctx.send(f"space created!\n- id: `{new_space.id}`\n-name: {new_space.name}")
+        await ctx.send(f"space created!\n- id: `{new_space.id}`\n- name: {new_space.name}")
+        await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
     @bridge_text.command(name="join-space")
     @commands.is_owner()
@@ -92,6 +93,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
             return await ctx.send("already in space? :/")
 
         await ctx.send("space joined! :3")
+        await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
 def get_cog_type():
     return BeaconFrontend

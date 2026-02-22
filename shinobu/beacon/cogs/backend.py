@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from discord.ext import commands
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.protocol import beacon
 
@@ -40,6 +41,11 @@ class BeaconBackend(shinobu_cog.ShinobuCog):
 
         self._beacon = beacon.Beacon(self.bot, self._shinobu_files)
         self.bot.shared_objects.add("beacon", self._beacon)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if not self._beacon.initialized:
+            await self._beacon.load_data()
 
 def get_cog_type():
     return BeaconBackend

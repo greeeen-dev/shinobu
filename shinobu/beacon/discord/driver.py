@@ -27,14 +27,14 @@ from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user,
                                    content as beacon_content, file as beacon_file)
 
 class DiscordMessageContent:
-    def __init__(self, content: str | None = None, components: discord.ui.BaseView | discord.ui.View | None = None,
+    def __init__(self, content: str | None = None, components: discord.ui.DesignerView | discord.ui.View | None = None,
                  files: list[discord.File] | None = None, embeds: list[discord.Embed] | None = None):
         self._content: str | None = content
-        self._components: discord.ui.BaseView | discord.ui.View | None = components
+        self._components: discord.ui.DesignerView | discord.ui.View | None = components
         self._files: list[discord.File] = files or []
         self._embeds: list[discord.Embed] = embeds or []
         self._components_v2: bool = (
-                type(components) is discord.ui.BaseView and components.is_components_v2()
+                type(components) is discord.ui.DesignerView and components.is_components_v2()
         ) if components else False
 
     @property
@@ -49,7 +49,7 @@ class DiscordMessageContent:
         return self._content
 
     @property
-    def components(self) -> discord.ui.BaseView | discord.ui.View | None:
+    def components(self) -> discord.ui.DesignerView | discord.ui.View | None:
         return self._components
 
     @property
@@ -125,8 +125,6 @@ class DiscordBeaconContentBlockConverter:
             container.add_text(author_content)
 
         # Add title and description block
-        title_thumbnail_row = discord.ui.ActionRow()
-
         title_desc_content = f"## {block.title}\n{block.description}"
 
         if block.url:
@@ -136,14 +134,17 @@ class DiscordBeaconContentBlockConverter:
             title_desc_content = block.description
 
         if title_desc_content:
-            title_thumbnail_row.add_item(discord.ui.TextDisplay(title_desc_content))
+            title_thumbnail_section = discord.ui.Section()
+            title_thumbnail_section.add_text(title_desc_content)
 
-        # Add thumbnail
-        if block.thumbnail:
-            title_thumbnail_row.add_item(discord.ui.Thumbnail(block.thumbnail))
+            # Add thumbnail
+            if block.thumbnail:
+                title_thumbnail_section.set_accessory(discord.ui.Thumbnail(block.thumbnail))
+
+            container.add_item(title_thumbnail_section)
 
         # Add fields
-        current_row = discord.ui.ActionRow()
+        current_section = discord.ui.Section()
         for field in block.fields:
             field_components = []
 
@@ -152,15 +153,15 @@ class DiscordBeaconContentBlockConverter:
             if field["value"]:
                 field_components.append(field["value"])
 
-            current_row.add_item(discord.ui.TextDisplay("\n".join(field_components)))
+            current_section.add_text("\n".join(field_components))
 
-            if not field["inline"] or len(current_row.items) == 3:
-                container.add_row(current_row)
-                current_row = discord.ui.ActionRow()
+            if not field["inline"] or len(current_section.items) == 3:
+                container.add_item(current_section)
+                current_section = discord.ui.Section()
 
         # Ensure all rows have been added
-        if len(current_row.items) > 0:
-            container.add_row(current_row)
+        if len(current_section.items) > 0:
+            container.add_item(current_section)
 
         # Add media
         if block.media:
@@ -174,7 +175,8 @@ class DiscordBeaconContentBlockConverter:
         if block.timestamp:
             footer_components.append(f"<t:{round(block.timestamp)}:f>")
 
-        current_row.add_item(discord.ui.TextDisplay(" • ".join(footer_components)))
+        if len(footer_components) > 0:
+            container.add_item(discord.ui.TextDisplay(" • ".join(footer_components)))
 
         return container
 
@@ -271,8 +273,9 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             channel=channel
         )
 
-    async def _to_discord_content(self, content: beacon_message.BeaconMessageContent, use_components_v2: bool | None = None
-                            ) -> DiscordMessageContent:
+    async def _to_discord_content(self, content: beacon_message.BeaconMessageContent,
+                                  destination: beacon_messageable.BeaconMessageable, use_components_v2: bool | None = None
+                                  ) -> DiscordMessageContent:
         if use_components_v2 is None:
             use_components_v2 = self._use_components_v2
 
@@ -299,7 +302,13 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 legacy_embeds.append(DiscordBeaconContentBlockConverter.embed(block_obj))
 
         # Process reply
-        for reply_message in content.replies:
+        for reply_message_group in content.replies:
+            # Find channel-specific reply
+            reply_message: beacon_message.BeaconMessage | None = reply_message_group.get_message_for(destination)
+
+            if not reply_message:
+                continue
+
             reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
             reply_url: str = f"https://discord.com/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
             reply_content: str | None = None
@@ -327,16 +336,16 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             # Create reply container (will get ID 10X)
             reply_container: discord.ui.Container = discord.ui.Container()
 
-            # Create list for reply items
+            # Create reply jump button
             # noinspection PyTypeChecker
-            reply_items: list[discord.ui.Item] = [
-                discord.ui.Button(
-                    style=discord.ButtonStyle.link,
-                    label=f'Replying to @{reply_author}',
-                    emoji='\U000021AA\U0000FE0F',
-                    url=reply_url
-                )
-            ]
+            reply_button: discord.ui.Button = discord.ui.Button(
+                style=discord.ButtonStyle.link,
+                label=f'Jump to message',
+                url=reply_url
+            )
+            reply_text: discord.ui.TextDisplay = discord.ui.TextDisplay(
+                f"\U000021AA\U0000FE0F **Replying to @{reply_author}**"
+            )
 
             # Create content text display (if possible)
             if reply_content:
@@ -344,11 +353,15 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 if len(reply_content) > 200:
                     reply_content = reply_content[:197] + "..."
 
-                reply_items.append(discord.ui.TextDisplay(reply_content))
+                reply_text= discord.ui.TextDisplay(
+                    f"\U000021AA\U0000FE0F **Replying to @{reply_author}** - {reply_content}"
+                )
 
             # Create reply action row
-            reply_row: discord.ui.ActionRow = discord.ui.ActionRow(*reply_items)
-            reply_container.add_row(reply_row)
+            reply_section: discord.ui.Section = discord.ui.Section(
+                reply_text, accessory=reply_button
+            )
+            reply_container.add_item(reply_section)
             reply_blocks.append(reply_container)
 
             # Add button to legacy reply components
@@ -370,7 +383,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         # Assemble to DiscordMessageContent
         if use_components_v2:
             # Assemble components
-            components = discord.ui.BaseView(
+            components = discord.ui.DesignerView(
                 store=False
             )
 
@@ -513,7 +526,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None):
+                   webhook_id: str | None = None, self_send: bool = False):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None
@@ -540,12 +553,42 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         # Convert message content data
         discord_content: DiscordMessageContent = await self._to_discord_content(
-            content, use_components_v2=self._use_components_v2
+            content, destination, use_components_v2=self._use_components_v2
         )
+
+        # Convert bot user to BeaconUser
+        self_user = self.get_user(str(self.bot.user.id))
+
+        # Get target
+        if webhook_id:
+            target: discord.TextChannel | discord.abc.Messageable = webhook_obj.channel
+        else:
+            target: discord.TextChannel | discord.abc.Messageable = self.bot.get_channel(int(destination.id))
+
+        # Convert channel to BeaconChannel
+        channel: beacon_channel.BeaconChannel = self.get_channel(self.get_server(str(target.guild.id)), str(target.id))
+
+        # Are we self-sending?
+        if str(webhook_obj.channel_id) == content.original_channel_id and not self_send:
+            # Return message object but don't send
+
+            return beacon_message.BeaconMessage(
+                message_id=content.original_id,
+                platform=self.platform,
+                author=send_as or self_user,
+                server=self.get_server(str(target.guild.id)),
+                channel=channel,
+                content=discord_content.raw_content,
+                attachments=len(discord_content.files),
+                replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
+                webhook_id=webhook_id if webhook_obj else None
+            )
 
         # Send the message!
         if webhook_id:
-            target: discord.TextChannel | discord.abc.Messageable = webhook_obj.channel
+            if not target:
+                return None
+
             message = await webhook_obj.send(
                 content=discord_content.content,
                 view=discord_content.components,
@@ -556,8 +599,6 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 wait=True
             )
         else:
-            target: discord.TextChannel | discord.abc.Messageable = self.bot.get_channel(int(destination.id))
-
             if not target:
                 return None
 
@@ -568,18 +609,15 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 files=discord_content.files
             )
 
-        # Convert message to BeaconMessage
-        self_user = self.get_user(str(self.bot.user.id))
-
         return beacon_message.BeaconMessage(
             message_id=str(message.id),
             platform=self.platform,
             author=send_as or self_user,
             server=self.get_server(str(target.guild.id)),
-            channel=self.get_channel(self.get_server(str(target.guild.id)), str(target.id)),
+            channel=channel,
             content=discord_content.raw_content,
             attachments=len(discord_content.files),
-            replies=content.replies,
+            replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
             webhook_id=webhook_id if webhook_obj else None
         )
 
@@ -589,7 +627,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         # Convert message content data
         discord_content: DiscordMessageContent = await self._to_discord_content(
-            content, use_components_v2=self._use_components_v2
+            content, destination=message.channel, use_components_v2=self._use_components_v2
         )
 
         # Edit message

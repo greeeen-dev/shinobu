@@ -43,7 +43,19 @@ class BeaconMessageCache:
         if len(target_dict.keys()) > self.cache_limit:
             target_dict.pop(next(iter(target_dict)))
 
-        target_dict.update({message.id: message})
+        if type(message) is beacon_message.BeaconMessageGroup:
+            if len(self._data_groups.keys()) > self.cache_limit:
+                self._data_groups.pop(next(iter(self._data_groups)))
+
+            self._data_groups.update({message.id: message})
+        else:
+            if len(self._data.keys()) > self.cache_limit:
+                self._data.pop(next(iter(self._data)))
+
+            self._data.update({message.id: message})
+
+        # Save data
+        self.save()
 
     def get_message(self, message_id: str) -> beacon_message.BeaconMessage | None:
         """Gets a message from the cache."""
@@ -57,7 +69,7 @@ class BeaconMessageCache:
         """Gets a message group from the cache."""
 
         for _, group in self._data_groups.items():
-            matches = [message for message in group.messages if message.id == message_id]
+            matches = [message for _, message in group.messages.items() if message.id == message_id]
 
             if len(matches) > 0:
                 return group
@@ -72,5 +84,11 @@ class BeaconMessageCache:
         for message in self._data:
             converted.update({message: self._data[message].to_dict()})
 
+        converted_groups = {}
+        for group in self._data_groups:
+            converted_groups.update({group: self._data_groups[group].to_dict()})
+
         # Save data as JSON
-        self.__wrapper.save_json("cache", self._data)
+        self.__wrapper.save_json("cache", {
+            "messages": converted, "groups": converted_groups
+        })

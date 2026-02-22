@@ -136,6 +136,8 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             embeds_index += 1
 
         content: beacon_message.BeaconMessageContent = beacon_message.BeaconMessageContent(
+            original_id=str(message.id),
+            original_channel_id=str(message.channel.id),
             blocks=blocks,
             files=files,
             replies=replies
@@ -158,6 +160,10 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+
+        if message.content.startswith(self.bot.command_prefix):
+            # Assume this is a text command
+            return
 
         if message.author.id == self.bot.user.id:
             # Do not self-bridge
@@ -194,6 +200,10 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         # Get Space
         space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
 
+        # Get the ID of the webhook to use
+        membership: beacon_space.BeaconSpaceMember = space.get_member(server)
+        webhook_id = membership.webhook_id
+
         if not space:
             # We can't bridge
             return
@@ -203,10 +213,11 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             author=author,
             space=space,
             content=content,
-            webhook_id=str(message.webhook_id),
+            webhook_id=webhook_id,
             skip_filter=True
         )
 
+        # TODO: Add returning the block reason.
         if preliminary_block:
             return
 
@@ -214,7 +225,8 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         await self._beacon.send(
             author=author,
             space=space,
-            content=content
+            content=content,
+            webhook_id=webhook_id
         )
 
 def get_cog_type():

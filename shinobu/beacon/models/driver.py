@@ -103,7 +103,7 @@ class BeaconDriver:
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None) -> beacon_message.BeaconMessage:
+                   webhook_id: str | None = None, self_send: bool = False) -> beacon_message.BeaconMessage:
         """Sends a message to a given destination."""
         raise BeaconDriverUnsupported()
 

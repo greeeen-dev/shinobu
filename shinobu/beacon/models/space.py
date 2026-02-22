@@ -83,14 +83,23 @@ class BeaconSpaceInvite:
             "uses": self.uses
         }
 
+    @classmethod
+    def from_dict(cls, data: dict) -> 'BeaconSpaceInvite':
+        return cls(
+            code=data["code"],
+            expiry=data["expiry"],
+            max_uses=data["max_uses"],
+            used=data.get("uses", 0)
+        )
+
 class BeaconSpaceMember:
     def __init__(self, platform: str, server: beacon_server.BeaconServer, channel: beacon_channel.BeaconChannel,
-                 webhook: beacon_webhook.BeaconWebhook | None = None, invite: BeaconSpaceInvite | str | None = None):
+                 webhook: str | None = None, invite: str | None = None):
         self._platform: str = platform
         self._server: beacon_server.BeaconServer = server
         self._channel: beacon_channel.BeaconChannel = channel
-        self._webhook: beacon_webhook.BeaconWebhook = webhook
-        self._invite: BeaconSpaceInvite | str | None = invite
+        self._webhook_id: str = webhook
+        self._invite: str | None = invite
 
     @property
     def platform(self) -> str:
@@ -113,6 +122,10 @@ class BeaconSpaceMember:
         return self._channel.id
 
     @property
+    def webhook_id(self) -> str | None:
+        return self._webhook_id
+
+    @property
     def invite(self) -> BeaconSpaceInvite | str | None:
         return self._invite
     
@@ -127,23 +140,25 @@ class BeaconSpaceMember:
             "platform": self.platform,
             "server": self.server_id,
             "channel": self.channel_id,
-            "invite": self.invite.code
+            "invite": self.invite,
+            "webhook": self._webhook_id
         }
 
 class BeaconSpace:
     def __init__(self, space_id: str, space_name: str, space_emoji: str | None = None, members: list | None = None,
                  invites: list | None = None, bans: list | None = None, private: bool = False, nsfw: bool = False,
-                 relay_deletes: bool = True, relay_edits: bool = True, relay_large_attachments: bool = True,
-                 filters: list | None = None, filter_configs: dict | None = None):
+                 private_owner_id: str | None = None, relay_deletes: bool = True, relay_edits: bool = True,
+                 relay_large_attachments: bool = True, filters: list | None = None, filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
         self._emoji: str = space_emoji
         self._members: list[BeaconSpaceMember] = members or []
         self._invites: list[BeaconSpaceInvite] = invites or []
-        self._bans: list[beacon_server.BeaconServer] = bans or []
+        self._bans: list[str] = bans or []
 
         # Room options
         self._private: bool = private
+        self._private_owner_id: str = private_owner_id
         self._nsfw: bool = nsfw
         self._deletes: bool = relay_deletes
         self._edits: bool = relay_edits
@@ -203,11 +218,24 @@ class BeaconSpace:
     def filter_configs(self) -> dict:
         return self._filter_configs
 
+    def add_invite(self, invite: BeaconSpaceInvite):
+        self._invites.append(invite)
+
     def use_invite(self, invite: BeaconSpaceInvite):
-        pass
+        invite_entry: BeaconSpaceInvite | None = None
+
+        for space_invite in self._invites:
+            if space_invite.code == invite.code:
+                invite_entry = space_invite
+                break
+
+        if not invite_entry:
+            raise BeaconSpaceInvalidInvite("Invalid invite")
+
+        invite_entry.use_invite()
 
     def is_banned(self, server: beacon_server.BeaconServer):
-        return server in self._bans
+        return server.id in self._bans
 
     def join(self, server: beacon_server.BeaconServer, channel: beacon_channel.BeaconChannel,
              webhook: beacon_webhook.BeaconWebhook | None = None, invite: BeaconSpaceInvite | None = None,
@@ -219,12 +247,17 @@ class BeaconSpace:
             platform=server.platform,
             server=server,
             channel=channel,
-            webhook=webhook
+            webhook=webhook,
+            invite=invite.code if invite else None
         )
         
         # Is the server a member already?
         if new_membership in self._members:
             raise BeaconSpaceAlreadyJoined("Already a member of this Space")
+
+        # Check if server is banned
+        if self.is_banned(server):
+            raise BeaconSpaceBanned("Server is banned from this Space")
         
         # Check invite for private rooms (unless forcibly joining)
         if self.private and not force:
@@ -242,10 +275,9 @@ class BeaconSpace:
                 raise BeaconSpaceInvalidInvite("Invalid invite")
             
             invite.use_invite()
-
-        # Check if server is banned
-        if self.is_banned(server):
-            raise BeaconSpaceBanned("Server is banned from this Space")
+            if invite.expired:
+                # Remove invite
+                self.invites.remove(invite)
         
         # Join space
         self._members.append(new_membership)

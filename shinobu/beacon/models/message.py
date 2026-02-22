@@ -17,14 +17,25 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 from shinobu.beacon.models import (content as beacon_content, abc, user as beacon_user, channel as beacon_channel,
-                                   server as beacon_server, webhook as beacon_webhook, file as beacon_file)
+                                   server as beacon_server, webhook as beacon_webhook, file as beacon_file,
+                                   messageable as beacon_messageable)
 
 class BeaconMessageContent:
-    def __init__(self, blocks: dict[str, beacon_content.BeaconContentBlock],
+    def __init__(self, original_id: str, original_channel_id: str, blocks: dict[str, beacon_content.BeaconContentBlock],
                  files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None):
+        self._original_id: str = original_id
+        self._original_channel_id: str = original_channel_id
         self._blocks: dict[str, beacon_content.BeaconContentBlock] = blocks
         self._files: list[beacon_file.BeaconFile] = files or []
         self._replies: list[BeaconMessageGroup] = replies or []
+
+    @property
+    def original_id(self) -> str:
+        return self._original_id
+
+    @property
+    def original_channel_id(self) -> str:
+        return self._original_channel_id
 
     @property
     def blocks(self) -> dict[str, beacon_content.BeaconContentBlock]:
@@ -77,7 +88,7 @@ class BeaconMessageGroup:
         self._author_id: str | None = author if type(author) is str else None
         self._space_id: str = space_id
         self._messages: dict[str, BeaconMessage] = {}
-        self._replies: list[str] = []
+        self._replies: list[str] = replies
 
         for message in messages:
             self._messages.update({message.id: message})
@@ -101,6 +112,13 @@ class BeaconMessageGroup:
     @property
     def replies(self) -> list:
         return self._replies
+
+    def get_message_for(self, messageable: beacon_messageable.BeaconMessageable) -> 'BeaconMessage | None':
+        for _, message in self._messages.items():
+            if message.channel.id == messageable.id:
+                return message
+
+        return None
 
     def to_dict(self) -> dict:
         data = {

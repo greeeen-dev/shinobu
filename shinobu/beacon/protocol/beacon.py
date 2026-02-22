@@ -26,7 +26,7 @@ from shinobu.beacon.protocol import (drivers as beacon_drivers, spaces as beacon
                                      filters as beacon_filters)
 from shinobu.beacon.models import (space as beacon_space, message as beacon_message, content as beacon_content,
                                    filter as beacon_filter, member as beacon_member, channel as beacon_channel,
-                                   driver as beacon_driver)
+                                   driver as beacon_driver, server as beacon_server)
 from shinobu.runtime.secrets import fine_grained
 
 # Set start method to fork
@@ -40,9 +40,13 @@ class BeaconMessageBlockedReason(Enum):
 
 class Beacon:
     def __init__(self, bot: bridge.Bot, files_wrapper: fine_grained.FineGrainedSecureFiles, enable_multi: bool = True):
-        self._enable_multi: bool = enable_multi
+        self._enable_multi: bool = enable_multi and False # We'll clamp this to False for now
         self.__wrapper: fine_grained.FineGrainedSecureFiles = files_wrapper
         self.__bot: bridge.Bot = bot
+        self._init: bool = False
+
+        # Get data
+        self._data: dict = self.__wrapper.read_json("beacon").get("raw", {})
 
         # Initialize managers
         self._drivers: beacon_drivers.BeaconDriverManager = beacon_drivers.BeaconDriverManager()
@@ -50,14 +54,15 @@ class Beacon:
         self._messages: beacon_messages.BeaconMessageCache = beacon_messages.BeaconMessageCache(self.__wrapper)
         self._filters: beacon_filters.BeaconFilterManager = beacon_filters.BeaconFilterManager()
 
-        # Get data
-        self._data: dict = self.__wrapper.read_json("beacon")
-
         # Create aiomultiprocess pool if available and enabled
         self._pool: aiomultiprocess.Pool | None = None
 
         if sys.platform != "win32" and self._enable_multi:
             self._pool = aiomultiprocess.Pool()
+
+    @property
+    def initialized(self) -> bool:
+        return self._init
 
     @property
     def drivers(self) -> beacon_drivers.BeaconDriverManager:
@@ -110,11 +115,85 @@ class Beacon:
         # Run tasks in pool (and return result)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
+    async def load_data(self):
+        if self.initialized:
+            return
+
+        # Get data from wrapper
+        data: dict = self.__wrapper.read_json("beacon")
+
+        # Load spaces
+        # {'spaces': {'674f2cfe-7f02-422e-a4da-06951bb13152': {'id': '674f2cfe-7f02-422e-a4da-06951bb13152', 'name': 'test', 'emoji': None, 'members': [], 'invites': [], 'bans': [], 'options': {'private': False, 'nsfw': False, 'relay_deletes': True, 'relay_edits': True, 'convert_large_files': True}}}}
+        for space_id, space_data in data.get("spaces").items():
+            space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
+                space_id=space_id,
+                space_name=space_data.get("name"),
+                space_emoji=space_data.get("emoji"),
+                private=space_data.get("options", {}).get("private"),
+                private_owner_id=space_data.get("options", {}).get("private_owner_id"),
+                nsfw=space_data.get("options", {}).get("nsfw"),
+                relay_deletes=space_data.get("options", {}).get("relay_deletes"),
+                relay_edits=space_data.get("options", {}).get("relay_edits"),
+                relay_large_attachments=space_data.get("options", {}).get("convert_large_files"),
+                filters=space_data.get("options", {}).get("filters"),
+                filter_configs=space_data.get("options", {}).get("filter_configs")
+            )
+
+            # Import invites
+            for invite in space_data.get("invites", []):
+                space.add_invite(beacon_space.BeaconSpaceInvite.from_dict(invite))
+
+            # Import members
+            for member in space_data.get("members"):
+                platform_driver: beacon_driver.BeaconDriver = self.drivers.get_driver(member["platform"])
+
+                # Get server
+                server: beacon_server.BeaconServer | None = platform_driver.get_server(member["server"])
+
+                if server:
+                    channel: beacon_channel.BeaconChannel | None = platform_driver.get_channel(server, member["channel"])
+                else:
+                    # We can't import this server, so make a dummy server
+                    server = beacon_server.BeaconServer(
+                        server_id=member["server"],
+                        platform=member["platform"],
+                        name="Unknown server"
+                    )
+                    channel: beacon_channel.BeaconChannel | None = beacon_channel.BeaconChannel(
+                        channel_id=member["channel"],
+                        platform=member["platform"],
+                        name="Unknown channel",
+                        server=server
+                    )
+
+                # Add member entry
+                space.join(
+                    server=server,
+                    channel=channel,
+                    invite=member["invite"],
+                    webhook=member["webhook"],
+                    force=True
+                )
+
+            # Add space
+            self.spaces.add_space(space)
+
+        self._init = True
+
+    def save_data(self):
+        # Assemble data dict
+        data: dict = {
+            "spaces": self._spaces.to_dict(),
+            "raw": self._data
+        }
+
+        self.__wrapper.save_json("beacon", data)
+
     async def can_send(self, author: beacon_member.BeaconMember,
                         space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
                         webhook_id: str | None = None, skip_filter: bool = False) -> BeaconMessageBlockedReason | None:
         # Get bridge paused data
-        bridge_paused: dict = self._data.get("bridge_paused")
+        bridge_paused: dict = self._data.get("bridge_paused", {})
 
         # Does the author have their bridge paused?
         if author.id in bridge_paused:
@@ -187,19 +266,21 @@ class Beacon:
 
     async def _send_platform(self, driver: beacon_driver.BeaconDriver, author: beacon_member.BeaconMember,
                              space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
-                             webhook_id: str | None = None) -> list[beacon_message.BeaconMessage]:
+                             self_send: bool = False) -> list[beacon_message.BeaconMessage]:
         space_members: list[beacon_space.BeaconSpaceMember] = [
             member for member in space.members if member.platform == driver.platform
         ]
         tasks = []
 
         for member in space_members:
-            tasks.append(driver.send(member.channel, content, author, webhook_id))
+            tasks.append(driver.send(
+                member.channel, content, send_as=author, webhook_id=member.webhook_id, self_send=self_send
+            ))
 
         if driver.supports_multi:
-            results: list[beacon_message.BeaconMessage] = await self._strategy_multi(tasks, return_exceptions=True)
+            results: list[beacon_message.BeaconMessage] = await self._strategy_multi(tasks, return_exceptions=False)
         elif driver.supports_async:
-            results: list[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=True)
+            results: list[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=False)
         else:
             results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
 
@@ -241,15 +322,21 @@ class Beacon:
         tasks = []
         for platform in self._drivers.platforms:
             driver = self._drivers.get_driver(platform)
-            tasks.append(self._send_platform(driver, author, space, content, webhook_id))
+            tasks.append(self._send_platform(driver, author, space, content))
 
         # Bridge to platforms
-        results: list[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=True)
+        results: list[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=False)
 
         # Assemble to beacon_message list
         results_final: list[beacon_message.BeaconMessage] = []
         for result in results:
-            results_final.extend(result)
+            if type(result) is list:
+                for result_message in result:
+                    if not type(result_message) is beacon_message.BeaconMessage:
+                        continue
+
+                    results_final.append(result_message)
+                    self._messages.add_message(result_message)
 
         # Convert replies
         replies_groups: list[str] = []
