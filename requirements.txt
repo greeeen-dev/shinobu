@@ -8,3 +8,5 @@ aiomultiprocess
 jellyfish
 tld
 better-profanity
+stoat.py
+fluxer.py
