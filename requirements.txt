@@ -9,4 +9,4 @@ jellyfish
 tld
 better-profanity
 stoat.py
-fluxer.py
+git+https://github.com/greeeen-dev/capacitor.git
