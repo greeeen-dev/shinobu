@@ -161,6 +161,9 @@ class BeaconDriver:
     def webhooks(self) -> BeaconDriverWebhookCache:
         return self._webhooks
 
+    def replace_bot(self, bot):
+        self._bot = bot
+
     def get_member(self, server: beacon_server.BeaconServer, member_id: str) -> beacon_member.BeaconMember | None:
         """Gets a member from a server."""
 

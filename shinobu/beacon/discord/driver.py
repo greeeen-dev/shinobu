@@ -86,6 +86,7 @@ class DiscordBeaconContentBlockConverter:
         )
 
         # Set author and footer data
+        # noinspection DuplicatedCode
         embed.set_author(
             name=block.author["text"],
             url=block.author["url"],
@@ -412,6 +413,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 components=legacy_reply_components
             )
 
+    # noinspection DuplicatedCode
     def sanitize_outbound(self, content: str) -> str:
         user_mentions = [item.split('>')[0] for item in content.split("<@")] if len(content.split("<@")) > 1 else []
         channel_mentions = [item.split('>')[0] for item in content.split("<#")] if len(content.split("<#")) > 1 else []
@@ -432,6 +434,10 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 # This is not a valid snowflake
                 continue
 
+            if not user:
+                # This is not a valid user
+                continue
+
             content = content.replace(f"<@{user_mention}>", f"@{user.global_name or user.name}")
 
         for channel_mention in channel_mentions:
@@ -439,6 +445,10 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 channel = self.bot.get_channel(int(channel_mention))
             except ValueError:
                 # This is not a valid snowflake
+                continue
+
+            if not channel:
+                # This is not a valid channel
                 continue
 
             content = content.replace(f"<#{channel_mention}>", f"#{channel.name}")

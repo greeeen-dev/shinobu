@@ -45,7 +45,7 @@ class BeaconBackend(shinobu_cog.ShinobuCog):
     @commands.Cog.listener()
     async def on_ready(self):
         if not self._beacon.initialized:
-            await self._beacon.load_data()
+            self._beacon.load_data()
 
 def get_cog_type():
     return BeaconBackend

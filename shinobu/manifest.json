@@ -7,10 +7,17 @@
   "modules": [
     "shinobu.beacon.cogs.backend",
     "shinobu.beacon.cogs.frontend",
-    "shinobu.beacon.discord.parent"
+    "shinobu.beacon.discord.parent",
+    "shinobu.beacon.stoat.parent",
+    "shinobu.beacon.fluxer.parent"
   ],
   "intents": {
+    "entitlements_secrets": "Entitlement needed for platform drivers to access client tokens.",
     "entitlements_files": "Entitlement needed for beacon and cache to store bridge data."
+  },
+  "entitlements_secrets": {
+    "shinobu.beacon.stoat.parent": ["TOKEN_STOAT"],
+    "shinobu.beacon.fluxer.parent": ["TOKEN_FLUXER"]
   },
   "entitlements_files": {
     "shinobu.beacon.cogs.backend": ["beacon", "cache"]

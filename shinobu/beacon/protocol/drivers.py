@@ -21,16 +21,28 @@ from shinobu.beacon.models import driver
 class BeaconDriverManager:
     def __init__(self):
         self._drivers: dict = {}
+        self._reserved: list = []
+        self._setup_callback = None
 
     @property
     def platforms(self) -> list:
         return list(self._drivers.keys())
 
+    @property
+    def has_reserved(self) -> bool:
+        return len(self._reserved) > 0
+
     def register_driver(self, platform: str, driver_object: driver.BeaconDriver):
         if platform in self._drivers:
             raise KeyError("Platform driver already registered")
 
+        if platform in self._reserved:
+            self._reserved.remove(platform)
+
         self._drivers.update({platform: driver_object})
+
+        if len(self._reserved) == 0 and self._setup_callback:
+            self._setup_callback()
 
     def remove_driver(self, platform: str):
         if platform not in self._drivers:
@@ -40,3 +52,11 @@ class BeaconDriverManager:
 
     def get_driver(self, platform: str) -> driver.BeaconDriver:
         return self._drivers.get(platform)
+
+    def reserve_driver(self, platform: str):
+        if not platform in self._reserved:
+            self._reserved.append(platform)
+
+    def set_setup_callback(self, callback):
+        if not self._setup_callback:
+            self._setup_callback = callback

@@ -115,7 +115,14 @@ class Beacon:
         # Run tasks in pool (and return result)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
-    async def load_data(self):
+    def load_data(self):
+        if self.drivers.has_reserved:
+            # Wait for all drivers to load
+            self.drivers.set_setup_callback(self._load_data)
+        else:
+            self._load_data()
+
+    def _load_data(self):
         if self.initialized:
             return
 
@@ -179,6 +186,7 @@ class Beacon:
             self.spaces.add_space(space)
 
         self._init = True
+        print("Beacon is ready!")
 
     def save_data(self):
         # Assemble data dict
