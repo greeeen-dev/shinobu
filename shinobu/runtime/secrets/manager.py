@@ -96,6 +96,11 @@ class TokenStore:
     def write_only(self):
         return self.__write_only
 
+    @property
+    def needs_reencryption(self) -> bool:
+        test_data: encryptor.GCMEncryptedData = encryptor.GCMEncryptedData.from_dict(self.__data['test'])
+        return test_data.outdated
+
     def load(self, filename: str | None = None):
         if not filename:
             filename = self.__filename

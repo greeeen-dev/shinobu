@@ -10,4 +10,6 @@ tld
 better-profanity
 stoat.py
 aiohttp
+argon2-cffi
+psutil
 git+https://github.com/greeeen-dev/capacitor.git

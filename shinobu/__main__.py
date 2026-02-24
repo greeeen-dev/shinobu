@@ -457,6 +457,9 @@ def start_bot():
         read_only=True,
         onetime=["TOKEN"]
     )
+    if tokenstore.needs_reencryption:
+        print("TokenStore is using outdated encryption. Please re-encrypt your secrets.")
+
     secrets_authority = SecretsIssuingAuthority()
     raw_encryptor = manager.RawEncryptor(
         password
@@ -481,6 +484,10 @@ def start_secrets_cli():
     global password
     cli_tokenstore = manager.TokenStore(password, debug=False, read_only=False)
     cli_encryptor = manager.RawEncryptor(password)
+
+    if cli_tokenstore.needs_reencryption:
+        print("TokenStore is using outdated encryption. Please re-encrypt your secrets.")
+
     cli: secrets_cli.ShinobuSecretsCLI = secrets_cli.ShinobuSecretsCLI(cli_tokenstore, cli_encryptor)
     cli.run()
 
