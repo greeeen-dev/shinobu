@@ -100,7 +100,6 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                     )
 
                     self._driver.replace_bot(self.fluxer_bot)
-                    print(self._driver.bot)
 
                 # Load events cog
                 await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.events")
