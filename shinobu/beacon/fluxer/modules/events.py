@@ -13,9 +13,12 @@ class FluxerEvents(cog.Cog):
         super().__init__(bot)
 
     async def _to_beacon_content(self, message: fluxer.Message) -> beacon_message.BeaconMessageContent:
+        # noinspection PyUnresolvedReferences
+        origin_driver: beacon_driver.BeaconDriver = self.bot.beacon.drivers.get_driver("fluxer")
+
         # Create text content block
         text_content: beacon_content.BeaconContentText = beacon_content.BeaconContentText(
-            content=message.content
+            content=origin_driver.sanitize_outbound(message.content)
         )
 
         # Create embed blocks
@@ -93,17 +96,22 @@ class FluxerEvents(cog.Cog):
         url: str = attachment["url"]
         proxy_url: str = attachment.get("proxy_url")
         filename: str = attachment["filename"]
+        media: bool = 'image/' in attachment["content_type"] or 'video/' in attachment["content_type"]
         data: bytes | None = None
 
-        async with aiohttp.ClientSession().get(proxy_url or url) as response:
+        session = aiohttp.ClientSession()
+        async with session.get(proxy_url or url) as response:
             if response.status == 200:
                 data = await response.read()
             else:
                 raise RuntimeError(f"Failed to fetch data: {response.status}")
+        await session.close()
 
         return beacon_file.BeaconFile(
             data=data,
-            filename=filename
+            url=url,
+            media=media,
+            filename=filename,
         )
 
     @cog.Cog.listener()
@@ -195,6 +203,99 @@ class FluxerEvents(cog.Cog):
             content=content,
             webhook_id=webhook_id
         )
+
+    @cog.Cog.listener()
+    async def on_message_edit(self, message: fluxer.Message):
+        # noinspection PyUnresolvedReferences
+        beacon_obj: beacon.Beacon = self.bot.beacon
+
+        origin_driver: beacon_driver.BeaconDriver = beacon_obj.drivers.get_driver("fluxer")
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
+
+        # Get the BeaconMessage object for the message
+        message_obj: beacon_message.BeaconMessage = beacon_obj.messages.get_message(str(message.id))
+
+        # Did we bridge this message?
+        if message.webhook_id:
+            if message_obj.author.id != str(message.webhook_id):
+                # We probably did
+                return
+
+        # Convert guild data to server.BeaconServer
+        server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild_id))
+
+        # Convert author data to member.BeaconMember
+        author: beacon_member.BeaconMember = origin_driver.get_member(server, str(message.author.id))
+
+        # Convert channel data to channel.BeaconChannel
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+
+        # Get Space
+        space: beacon_space.BeaconSpace = beacon_obj.spaces.get_space_for_channel(channel)
+
+        # Get the ID of the webhook to use
+        membership: beacon_space.BeaconSpaceMember = space.get_member(server)
+        webhook_id = membership.webhook_id
+
+        if not space:
+            # We can't bridge
+            return
+
+        # Run preliminary checks
+        preliminary_block: beacon.BeaconMessageBlockedReason | None = await beacon_obj.can_send(
+            author=author,
+            space=space,
+            content=content,
+            webhook_id=webhook_id,
+            skip_filter=True
+        )
+
+        # TODO: Add returning the block reason.
+        if preliminary_block:
+            return
+
+        # Edit the message!
+        await beacon_obj.edit(
+            message=message_obj,
+            content=content
+        )
+
+    @cog.Cog.listener()
+    async def on_message_delete(self, message: fluxer.Message):
+        # noinspection PyUnresolvedReferences
+        beacon_obj: beacon.Beacon = self.bot.beacon
+
+        origin_driver: beacon_driver.BeaconDriver = beacon_obj.drivers.get_driver("discord")
+
+        # Get the BeaconMessage object for the message
+        message_obj: beacon_message.BeaconMessage = beacon_obj.messages.get_message(str(message.id))
+        if not message_obj:
+            # We can't remove messages that aren't cached
+            return
+
+        # Did we bridge this message?
+        if message.webhook_id:
+            if message_obj.author.id != str(message.webhook_id):
+                # We probably did
+                return
+
+        # Convert guild data to server.BeaconServer
+        server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild_id))
+
+        # Convert channel data to channel.BeaconChannel
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+
+        # Get Space
+        space: beacon_space.BeaconSpace = beacon_obj.spaces.get_space_for_channel(channel)
+
+        if not space:
+            # We can't bridge deletes, even if it was sent in the Space by the server
+            return
+
+        # Delete the message!
+        await beacon_obj.delete(message=message_obj)
 
 async def setup(bot):
     await bot.add_cog(FluxerEvents(bot))

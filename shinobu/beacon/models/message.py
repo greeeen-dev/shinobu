@@ -117,6 +117,10 @@ class BeaconMessageGroup:
         return self._author.id if self._author else self._author_id
 
     @property
+    def space_id(self) -> str:
+        return self._space_id
+
+    @property
     def messages(self) -> dict:
         return self._messages
 

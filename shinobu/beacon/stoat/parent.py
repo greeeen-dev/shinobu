@@ -32,7 +32,8 @@ class StoatBot(stoat_commands.Bot):
         self._driver: stoat_driver.StoatDriver = driver_obj
 
     def register_driver(self):
-        self._beacon.drivers.register_driver("stoat", self._driver)
+        if "stoat" not in self._beacon.drivers.platforms:
+            self._beacon.drivers.register_driver("stoat", self._driver)
 
     async def on_ready(self, _, /):
         print(f"Logged in to Stoat as {self.user.name} ({self.user.id})")

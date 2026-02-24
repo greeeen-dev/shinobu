@@ -34,7 +34,7 @@ class BeaconMessageCache:
     def messages(self) -> int:
         return len(self._data.keys())
 
-    def add_message(self, message: beacon_message.BeaconMessage | beacon_message.BeaconMessageGroup):
+    def add_message(self, message: beacon_message.BeaconMessage | beacon_message.BeaconMessageGroup, save: bool = False):
         target_dict = self._data_groups if type(message) is beacon_message.BeaconMessageGroup else self._data
 
         if message.id in target_dict.keys():
@@ -53,6 +53,16 @@ class BeaconMessageCache:
                 self._data.pop(next(iter(self._data)))
 
             self._data.update({message.id: message})
+
+        # Save data
+        if save:
+            self.save()
+
+    def remove_message_group(self, message_group: beacon_message.BeaconMessageGroup):
+        for message in message_group.messages:
+            self._data.pop(message, None)
+
+        self._data_groups.pop(message_group.id, None)
 
         # Save data
         self.save()

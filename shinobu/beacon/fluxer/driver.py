@@ -112,6 +112,9 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         # Overwrite self.bot (to set typing)
         self._bot: fluxer.Bot | fluxer.Client = bot
 
+        # Disable aiomultiprocess for now
+        self._supports_multi = False
+
         # Enable age-gate
         self._supports_agegate = True
     
@@ -195,8 +198,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
             channel=channel
         )
 
-    @staticmethod
-    async def _to_fluxer_content(content: beacon_message.BeaconMessageContent,
+    async def _to_fluxer_content(self, content: beacon_message.BeaconMessageContent,
                                  _: beacon_messageable.BeaconMessageable) -> FluxerMessageContent:
         # Content
         embeds: list[fluxer.Embed] = []
@@ -218,7 +220,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
         # Assemble to FluxerMessageContent
         return FluxerMessageContent(
-            content="\n".join(text_components),
+            content=self.sanitize_inbound("\n".join(text_components)),
             files=files,
             embeds=embeds,
             replies=replies
@@ -262,8 +264,16 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         return content
 
     def sanitize_inbound(self, content: str) -> str:
-        """Nothing to sanitize"""
-        return content
+        # Escape pings
+        return content.replace(
+            "@everyone", "@ everyone"
+        ).replace(
+            "@here", "@ here"
+        ).replace(
+            "<@", "<\\@"
+        ).replace(
+            "<@&", "<\\@\\&"
+        )
 
     # Beacon driver functions
     def get_user(self, user_id: str):
@@ -434,7 +444,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
     async def _delete(self, message: beacon_message.BeaconMessage):
         channel = self.bot.get_channel(int(message.channel.id))
-        message_obj = await channel.fetch_message(message.id)
+        message_obj = await channel.fetch_message(int(message.id))
 
         # Delete message
         await message_obj.delete()

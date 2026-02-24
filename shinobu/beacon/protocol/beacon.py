@@ -329,6 +329,42 @@ class Beacon:
 
         return results
 
+    async def _edit_platform(self, driver: beacon_driver.BeaconDriver, message_group: beacon_message.BeaconMessageGroup,
+                             content: beacon_message.BeaconMessageContent):
+        platform_messages: list[beacon_message.BeaconMessage] = [
+            message for _, message in message_group.messages.items() if message.platform == driver.platform
+        ]
+        tasks = []
+
+        for message in platform_messages:
+            tasks.append(driver.edit(message, content))
+
+        if driver.supports_multi:
+            await self._strategy_multi(tasks, return_exceptions=False)
+        elif driver.supports_async:
+            await self._strategy_async(tasks, return_exceptions=False)
+        else:
+            await self._strategy_sequential(tasks)
+
+    async def _delete_platform(self, driver: beacon_driver.BeaconDriver,
+                               message_group: beacon_message.BeaconMessageGroup, original: beacon_message.BeaconMessage
+                               ):
+        platform_messages: list[beacon_message.BeaconMessage] = [
+            message for _, message in message_group.messages.items() if message.platform == driver.platform and
+                                                                        message.id != original.id
+        ]
+        tasks = []
+
+        for message in platform_messages:
+            tasks.append(driver.delete(message))
+
+        if driver.supports_multi:
+            await self._strategy_multi(tasks, return_exceptions=False)
+        elif driver.supports_async:
+            await self._strategy_async(tasks, return_exceptions=False)
+        else:
+            await self._strategy_sequential(tasks)
+
     async def send(self, author: beacon_member.BeaconMember, space: beacon_space.BeaconSpace,
                    content: beacon_message.BeaconMessageContent, webhook_id: str | None = None
                    ) -> beacon_message.BeaconMessageGroup:
@@ -394,7 +430,84 @@ class Beacon:
         )
 
         # Cache message group
-        self._messages.add_message(message_group)
+        await self.__bot.loop.run_in_executor(
+            None, lambda: self._messages.add_message(message_group, save=True)
+        )
 
         # Return group
         return message_group
+
+    async def edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent):
+        """Edits a message sent to a Space."""
+
+        if not self.initialized:
+            raise BeaconNotInit()
+
+        origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message.platform)
+
+        # Get message metadata
+        server: beacon_server.BeaconServer = message.server
+        author: beacon_member.BeaconMember = origin_driver.get_member(server, message.author.id)
+
+        # Get message group
+        message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
+        if not message_group:
+            # We can't do anything with uncached messages
+            return
+
+        space: beacon_space.BeaconSpace = self.spaces.get_space(message_group.space_id)
+
+        # Ensure we can send the message
+        blocking_condition: BeaconMessageBlockedReason | None = await self.can_send(author, space, content)
+
+        if blocking_condition:
+            raise ValueError("Message blocked from being sent.")
+
+        # Get the server's space membership
+        space_membership: beacon_space.BeaconSpaceMember = space.get_member(author.server)
+
+        # We'll re-fetch the channel just to check for age-gate status updates
+        # noinspection DuplicatedCode
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(
+            space_membership.server, space_membership.channel_id
+        )
+
+        if (
+                (space.nsfw and not channel.nsfw) or
+                (not space.nsfw and channel.nsfw) or
+                (space.nsfw and not origin_driver.supports_agegate)
+        ):
+            raise ValueError("Age gate mismatch.")
+
+        # Edit message for each platform
+        tasks = []
+        for platform in self._drivers.platforms:
+            driver = self._drivers.get_driver(platform)
+            tasks.append(self._edit_platform(driver, message_group, content))
+
+        # Bridge to platforms
+        await self._strategy_async(tasks, return_exceptions=False)
+
+    async def delete(self, message: beacon_message.BeaconMessage):
+        """Deletes a message sent to a Space."""
+
+        if not self.initialized:
+            raise BeaconNotInit()
+
+        # Get message group
+        message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
+        if not message_group:
+            # We can't do anything with uncached messages
+            return
+
+        # Edit message for each platform
+        tasks = []
+        for platform in self._drivers.platforms:
+            driver = self._drivers.get_driver(platform)
+            tasks.append(self._delete_platform(driver, message_group, message))
+
+        # Bridge to platforms
+        await self._strategy_async(tasks, return_exceptions=False)
+
+        # Remove message group from cache
+        await self.__bot.loop.run_in_executor(None, lambda: self.messages.remove_message_group(message_group))

@@ -31,7 +31,8 @@ available_mib: int = psutil.virtual_memory().total / 1048576
 
 # Available KDFs
 kdf_available: list = [
-    "pbkdf2", "argon2"
+    "argon2", # Recommended
+    "pbkdf2"
 ]
 
 # KDF profiles
@@ -52,6 +53,7 @@ kdf_profiles: dict[str, dict] = {
 argon2_available: list = [
     "argon2_low"
 ]
+
 if available_mib >= 2048:
     # Enable high-memory profile
     argon2_available.append("argon2_high")
@@ -229,14 +231,14 @@ class GCMEncryptor:
 if __name__ == "__main__":
     random_plaintext_length = 100
     encryptor = GCMEncryptor()
-    print(f"Testing GCMEncryptor encryption with {random_plaintext_length}-char plaintext with password 'password'...")
 
     # Generate plaintext
     plaintext = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(random_plaintext_length)])
+    print(f"Testing GCMEncryptor encryption with {len(plaintext)}-char plaintext with password 'password'...")
 
     # Test encryption
     stime = time.time()
-    encrypted_data: GCMEncryptedData = encryptor.encrypt(plaintext, "password", kdf="pbkdf2", profile="pbkdf2_hmac_sha_256")
+    encrypted_data: GCMEncryptedData = encryptor.encrypt(plaintext, "password", kdf="argon2", profile="argon2_low")
     etime = time.time() - stime
 
     # Test decryption
@@ -246,7 +248,7 @@ if __name__ == "__main__":
 
     # Print encrypted data
     print("Encrypted data info:")
-    print(f"- ciphertext: {encrypted_data.ciphertext if random_plaintext_length <= 1000 else '[omitted]'}")
+    print(f"- ciphertext: {encrypted_data.ciphertext if len(plaintext) <= 1000 else '[omitted]'}")
     print(f"- tag: {encrypted_data.tag}")
     print(f"- nonce: {encrypted_data.nonce}")
     print(f"- salt: {encrypted_data.salt}")
@@ -257,7 +259,7 @@ if __name__ == "__main__":
 
     # Print decrypted data
     print("Decrypted data info:")
-    print(f"- plaintext: {decrypted_data if random_plaintext_length <= 1000 else '[omitted]'}")
+    print(f"- plaintext: {decrypted_data if len(plaintext) <= 1000 else '[omitted]'}")
     print(f"- duration: {round(dtime * 1000, 2)}ms")
     print("")
 

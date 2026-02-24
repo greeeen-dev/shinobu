@@ -56,7 +56,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
     async def _to_beacon_content(self, message: discord.Message) -> beacon_message.BeaconMessageContent:
         # Create text content block
         text_content: beacon_content.BeaconContentText = beacon_content.BeaconContentText(
-            content=message.content
+            content=self._driver.sanitize_outbound(message.content)
         )
 
         # Create embed blocks
@@ -164,12 +164,23 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
     @staticmethod
     async def _get_attachment_data(attachment: discord.Attachment) -> beacon_file.BeaconFile:
-        data: bytes = await attachment.read(use_cached=True)
         filename: str = attachment.filename
         spoiler: bool = attachment.is_spoiler()
+        media: bool = "image/" in attachment.content_type or "video/" in attachment.content_type
+
+        # Read data
+        if media:
+            try:
+                data: bytes = await attachment.read(use_cached=True)
+            except discord.HTTPException:
+                data: bytes = await attachment.read(use_cached=False)
+        else:
+            data: bytes = await attachment.read(use_cached=False)
 
         return beacon_file.BeaconFile(
             data=data,
+            url=attachment.url,
+            media=media,
             filename=filename,
             spoiler=spoiler
         )
@@ -247,6 +258,93 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             content=content,
             webhook_id=webhook_id
         )
+
+    @commands.Cog.listener()
+    async def on_message_edit(self, _, message: discord.Message):
+        origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
+
+        # Get the BeaconMessage object for the message
+        message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
+
+        # Did we bridge this message?
+        if message.webhook_id:
+            if message_obj.author.id != str(message.webhook_id):
+                # We probably did
+                return
+
+        # Convert guild data to server.BeaconServer
+        server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild.id))
+
+        # Convert author data to member.BeaconMember
+        author: beacon_member.BeaconMember = origin_driver.get_member(server, str(message.author.id))
+
+        # Convert channel data to channel.BeaconChannel
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+
+        # Get Space
+        space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
+
+        # Get the ID of the webhook to use
+        membership: beacon_space.BeaconSpaceMember = space.get_member(server)
+        webhook_id = membership.webhook_id
+
+        if not space:
+            # We can't bridge
+            return
+
+        # Run preliminary checks
+        preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
+            author=author,
+            space=space,
+            content=content,
+            webhook_id=webhook_id,
+            skip_filter=True
+        )
+
+        # TODO: Add returning the block reason.
+        if preliminary_block:
+            return
+
+        # Edit the message!
+        await self._beacon.edit(
+            message=message_obj,
+            content=content
+        )
+
+    @commands.Cog.listener()
+    async def on_message_delete(self, message: discord.Message):
+        origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+
+        # Get the BeaconMessage object for the message
+        message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
+        if not message_obj:
+            # We can't remove messages that aren't cached
+            return
+
+        # Did we bridge this message?
+        if message.webhook_id:
+            if message_obj.author.id != str(message.webhook_id):
+                # We probably did
+                return
+
+        # Convert guild data to server.BeaconServer
+        server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild.id))
+
+        # Convert channel data to channel.BeaconChannel
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+
+        # Get Space
+        space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
+
+        if not space:
+            # We can't bridge deletes, even if it was sent in the Space by the server
+            return
+
+        # Delete the message!
+        await self._beacon.delete(message=message_obj)
 
 def get_cog_type():
     return DiscordDriverParent

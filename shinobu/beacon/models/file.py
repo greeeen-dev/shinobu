@@ -19,14 +19,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 class BeaconFile:
     """A class representing message files."""
 
-    def __init__(self, data: bytes, filename: str | None = None, spoiler: bool = False):
+    def __init__(self, data: bytes, url: str, media: bool, filename: str | None = None, spoiler: bool = False):
         self._data: bytes = data
+        self._url: str = url
+        self._media: bool = media
         self._filename: str | None = filename
         self._spoiler: bool = spoiler
 
     @property
     def data(self) -> bytes:
         return self._data
+
+    @property
+    def url(self) -> str:
+        return self._url
+
+    @property
+    def is_media(self) -> bool:
+        return self._media
 
     @property
     def filename(self) -> str | None:

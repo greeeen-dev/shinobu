@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import io
+import uuid
 import discord
 from datetime import datetime
 from discord.ext import bridge
@@ -200,6 +201,9 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         # Enable age-gate
         self._supports_agegate = True
 
+        # Disable aiomultiprocess for now
+        self._supports_multi = False
+
         # Components v2 flag
         self._use_components_v2: bool = True
 
@@ -283,6 +287,9 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         # Components v2 content
         container_blocks: list[discord.ui.Container] = []
         reply_blocks: list[discord.ui.Container] = []
+        gallery_block: discord.ui.MediaGallery = discord.ui.MediaGallery(id=500)
+        file_blocks: list[discord.ui.File] = []
+        file_block_files: list[discord.File] = []
 
         # Legacy content
         legacy_embeds: list[discord.Embed] = []
@@ -290,7 +297,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         # Universal content
         text_components: list[str] = []
-        files: list[discord.File] = DiscordBeaconFilesConverter.files(content.files)
+        files: list[discord.File] = []
 
         # Convert blocks
         for block_id in content.blocks:
@@ -303,6 +310,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 legacy_embeds.append(DiscordBeaconContentBlockConverter.embed(block_obj))
 
         # Process reply
+        has_reply: bool = False
         for reply_message_group in content.replies:
             # Find channel-specific reply
             reply_message: beacon_message.BeaconMessage | None = reply_message_group.get_message_for(destination)
@@ -372,6 +380,35 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 )
             ))
 
+            has_reply = True
+
+        # Process attachments
+        for file in content.files:
+            discord_file: discord.File = DiscordBeaconFilesConverter.file(file)
+            files.append(discord_file)
+
+            if file.is_media:
+                if len(gallery_block.items) == 10:
+                    continue
+
+                # Add to Gallery
+                gallery_block.add_item(file.url, spoiler=file.spoiler)
+            else:
+                if not discord_file.filename:
+                    discord_file.filename = str(uuid.uuid4())
+
+                # Add as file block
+                file_blocks.append(discord.ui.File(
+                    url=f"attachment://{discord_file.filename}",
+                    spoiler=file.spoiler
+                ))
+                file_block_files.append(discord_file)
+
+        # Dynamically set Components V2
+        if not has_reply and len(legacy_embeds) > 0 and len(files) == 0:
+            # Keep embeds as original as possible by not using Components v2
+            use_components_v2 = False
+
         # Assemble to DiscordMessageContent
         if use_components_v2:
             # Assemble components
@@ -392,7 +429,18 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 id=300
             ))
 
-            # Add containers (we will assign 4XX to these)
+            # Add gallery (we will assign ID 500 to this)
+            if len(gallery_block.items) > 0:
+                components.add_item(gallery_block)
+
+            # Add file blocks (we will assign ID 6XX to these)
+            current_file_id = 600
+            for file_block in file_blocks:
+                file_block.id = current_file_id
+                components.add_item(file_block)
+                current_file_id += 1
+
+            # Add containers (we will assign ID 4XX to these)
             current_container_id = 400
             for container_block in container_blocks:
                 container_block.id = current_container_id
@@ -400,14 +448,14 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 current_container_id += 1
 
             return DiscordMessageContent(
-                content="\n".join(text_components),
+                content=self.sanitize_inbound("\n".join(text_components)),
                 components=components,
-                files=files
+                files=file_block_files
             )
         else:
             # Use Components v1
             return DiscordMessageContent(
-                content="\n".join(text_components),
+                content=self.sanitize_inbound("\n".join(text_components)),
                 files=files,
                 embeds=legacy_embeds,
                 components=legacy_reply_components
@@ -468,7 +516,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         return content
 
     def sanitize_inbound(self, content: str) -> str:
-        """Nothing to sanitize"""
+        # Nothing to sanitize
         return content
 
     # Beacon driver functions
@@ -597,7 +645,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 content=discord_content.raw_content,
                 attachments=len(discord_content.files),
                 replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
-                webhook_id=webhook_id if webhook_obj else None
+                webhook_id=None
             )
 
         # Send the message!
@@ -639,24 +687,62 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
     async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent):
         channel = self.bot.get_channel(int(message.channel.id))
-        message_obj = await channel.fetch_message(int(message.id))
 
         # Convert message content data
         discord_content: DiscordMessageContent = await self._to_discord_content(
             content, destination=message.channel, use_components_v2=self._use_components_v2
         )
 
-        # Edit message
-        await message_obj.edit(
-            content=discord_content.content,
-            view=discord_content.components,
-            embeds=discord_content.embeds,
-            files=discord_content.files
-        )
+        # Do not try to edit the author's message
+        if message.id == content.original_id:
+            return
+
+        if message.webhook_id:
+            # Ensure webhook is in cache
+            await self.getch_webhook(message.webhook_id)
+
+            # Get webhook from cache
+            webhook_obj: discord.Webhook = self._webhooks.get_webhook(message.webhook_id)
+
+            # Edit message
+            await webhook_obj.edit_message(
+                message_id=int(message.id),
+                content=discord_content.content,
+                view=discord_content.components,
+                embeds=discord_content.embeds,
+                files=discord_content.files,
+                allowed_mentions=discord.AllowedMentions.none()
+            )
+        else:
+            message_obj: discord.Message = await channel.fetch_message(int(message.id))
+
+            if message_obj.author.id != self.bot.user.id:
+                # We can't edit messages we didn't write
+                return
+
+            # Edit message
+            await message_obj.edit(
+                content=discord_content.content,
+                view=discord_content.components,
+                embeds=discord_content.embeds,
+                files=discord_content.files,
+                allowed_mentions=discord.AllowedMentions.none()
+            )
 
     async def _delete(self, message: beacon_message.BeaconMessage):
         channel = self.bot.get_channel(int(message.channel.id))
-        message_obj = await channel.fetch_message(int(message.id))
 
-        # Delete message
-        await message_obj.delete()
+        if message.webhook_id:
+            # Ensure webhook is in cache
+            await self.getch_webhook(message.webhook_id)
+
+            # Get webhook from cache
+            webhook_obj: discord.Webhook = self._webhooks.get_webhook(message.webhook_id)
+
+            # Delete message
+            await webhook_obj.delete_message(message_id=int(message.id))
+        else:
+            message_obj = await channel.fetch_message(int(message.id))
+
+            # Delete message
+            await message_obj.delete()
