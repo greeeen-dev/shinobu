@@ -62,7 +62,7 @@ class BeaconFrontend(cog.Cog):
 
         # Get Beacon objects for server. channel and webhook
         server_obj: beacon_server.BeaconServer = fluxer_driver.get_server(str(ctx.guild_id))
-        channel_obj: beacon_channel.BeaconChannel = fluxer_driver.get_channel(server_obj, str(ctx.channel.id))
+        channel_obj: beacon_channel.BeaconChannel = fluxer_driver.get_channel(server_obj, str(ctx.channel_id))
 
         # Check if we're already in a space
         if self._beacon.spaces.get_space_for_channel(channel_obj):

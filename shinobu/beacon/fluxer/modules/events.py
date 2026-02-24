@@ -157,6 +157,16 @@ class FluxerEvents(cog.Cog):
         # Convert guild data to server.BeaconServer
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild_id))
 
+        # Convert channel data to channel.BeaconChannel
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel_id))
+
+        # Get Space
+        # noinspection PyUnresolvedReferences
+        space: beacon_space.BeaconSpace = self.bot.beacon.spaces.get_space_for_channel(channel)
+        if not space:
+            # We can't bridge
+            return
+
         # Convert author data to member.BeaconMember
         author: beacon_member.BeaconMember | None = origin_driver.get_member(server, str(message.author.id))
 
@@ -166,20 +176,9 @@ class FluxerEvents(cog.Cog):
             await fluxer_guild.fetch_member(str(message.author.id))
             author = origin_driver.get_member(server, str(message.author.id))
 
-        # Convert channel data to channel.BeaconChannel
-        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel_id))
-
-        # Get Space
-        # noinspection PyUnresolvedReferences
-        space: beacon_space.BeaconSpace = self.bot.beacon.spaces.get_space_for_channel(channel)
-
         # Get the ID of the webhook to use
         membership: beacon_space.BeaconSpaceMember = space.get_member(server)
         webhook_id = membership.webhook_id
-
-        if not space:
-            # We can't bridge
-            return
 
         # Run preliminary checks
         # noinspection PyUnresolvedReferences
