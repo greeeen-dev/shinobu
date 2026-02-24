@@ -262,11 +262,14 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
     async def on_message_edit(self, _, message: discord.Message):
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
-        # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
-
         # Get the BeaconMessage object for the message
         message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
+        if not message_obj:
+            # We can't edit messages that aren't cached
+            return
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
         # Did we bridge this message?
         if message.webhook_id:
