@@ -83,7 +83,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
                 )
 
             if embed.timestamp:
-                embed.timestamp = int(embed.timestamp.timestamp())
+                embed_block.timestamp = int(embed.timestamp.timestamp())
 
             for field in embed.fields:
                 embed_block.add_field(
