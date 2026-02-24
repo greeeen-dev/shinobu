@@ -21,12 +21,13 @@ that's also flexible and ready for the demands of tomorrow.
 - [X] Shinobu Runtime (core, secrets manager, debug tools, etc)
 - [X] Basic Discord cross-server bridge (v0.1)
 - [ ] Stoat (formerly Revolt) support (v0.2)
-- [ ] Fluxer support (v0.2/v0.3)
+- [ ] Fluxer support (v0.2)
+- [ ] Bridge cache backup and restore (v0.2)
 - [ ] Moderation & customization tools (v0.3/v1)
 
 ### And the stuff reserved for later
 - [ ] Spacebar support
-- [ ] Matrix support
+- [ ] Matrix support (maybe?)
 
 ## Attribution
 This is just a rough list of attributions, I'll do a proper one as I work on the project.
