@@ -144,7 +144,7 @@ class Beacon:
 
         # Load spaces
         # {'spaces': {'674f2cfe-7f02-422e-a4da-06951bb13152': {'id': '674f2cfe-7f02-422e-a4da-06951bb13152', 'name': 'test', 'emoji': None, 'members': [], 'invites': [], 'bans': [], 'options': {'private': False, 'nsfw': False, 'relay_deletes': True, 'relay_edits': True, 'convert_large_files': True}}}}
-        for space_id, space_data in data.get("spaces").items():
+        for space_id, space_data in data.get("spaces", {}).items():
             space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
                 space_id=space_id,
                 space_name=space_data.get("name"),
