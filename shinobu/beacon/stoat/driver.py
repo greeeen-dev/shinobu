@@ -97,7 +97,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
         super().__init__("stoat", bot, message_cache)
 
         # Overwrite self.bot (to set typing)
-        self.bot: commands.Bot = bot
+        self._bot: commands.Bot = bot
 
         # Enable age-gate
         self._supports_agegate = True

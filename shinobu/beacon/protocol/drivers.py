@@ -19,9 +19,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 from shinobu.beacon.models import driver
 
 class BeaconDriverManager:
-    def __init__(self):
+    def __init__(self, platform_whitelist: bool, allowed_platforms: list | None):
         self._drivers: dict = {}
         self._reserved: list = []
+        self._whitelist: bool = platform_whitelist
+        self._allowed_platforms: list = allowed_platforms or []
         self._setup_callback = None
 
     @property
@@ -29,10 +31,21 @@ class BeaconDriverManager:
         return list(self._drivers.keys())
 
     @property
+    def uses_platform_whitelist(self) -> bool:
+        return self._whitelist
+
+    @property
+    def allowed_platforms(self) -> list:
+        return self._allowed_platforms
+
+    @property
     def has_reserved(self) -> bool:
         return len(self._reserved) > 0
 
     def register_driver(self, platform: str, driver_object: driver.BeaconDriver):
+        if self.uses_platform_whitelist and not platform in self.allowed_platforms:
+            raise ValueError("Platform not in whitelist")
+
         if platform in self._drivers:
             raise KeyError("Platform driver already registered")
 
@@ -44,8 +57,10 @@ class BeaconDriverManager:
         if len(self._reserved) == 0 and self._setup_callback:
             self._setup_callback()
 
-    def remove_driver(self, platform: str):
+    def remove_driver(self, platform: str, silent: bool = False):
         if platform not in self._drivers:
+            if silent:
+                return
             raise KeyError("Platform driver not registered")
 
         self._drivers.pop(platform)
@@ -54,8 +69,18 @@ class BeaconDriverManager:
         return self._drivers.get(platform)
 
     def reserve_driver(self, platform: str):
+        if self.uses_platform_whitelist and not platform in self.allowed_platforms:
+            raise ValueError("Platform not in whitelist")
+
         if not platform in self._reserved:
             self._reserved.append(platform)
+
+    def unreserve_driver(self, platform: str):
+        if platform in self._reserved:
+            self._reserved.remove(platform)
+
+        if len(self._reserved) == 0 and self._setup_callback:
+            self._setup_callback()
 
     def set_setup_callback(self, callback):
         if not self._setup_callback:

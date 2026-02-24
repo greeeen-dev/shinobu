@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import tomllib
 import ujson as json
 from discord.ext import bridge
 
@@ -37,6 +38,14 @@ class ShinobuBot(bridge.Bot):
         super().__init__(*args, **kwargs)
         self.__shared_objects: ShinobuSharedObjects = ShinobuSharedObjects()
         self.__cog_entitlements_loader = None
+
+        # Load configs
+        self._config: dict = {}
+        try:
+            with open("config.toml", "rb") as file:
+                self._config = tomllib.load(file)
+        except (FileNotFoundError, tomllib.TOMLDecodeError):
+            pass
 
         # Get manifest
         self._manifest: str | None = None
@@ -63,6 +72,10 @@ class ShinobuBot(bridge.Bot):
 
         for module in data["modules"]:
             self.__cog_entitlements_loader.load_extension(module)
+
+    @property
+    def config(self) -> dict:
+        return self._config
 
     @property
     def shared_objects(self):

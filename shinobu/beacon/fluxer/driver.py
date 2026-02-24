@@ -20,8 +20,8 @@ import fluxer
 from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
                                    member as beacon_member, channel as beacon_channel, message as beacon_message,
-                                   messageable as beacon_messageable, content as beacon_content, file as beacon_file)
-from shinobu.beacon.stoat.models import embed as stoat_embed
+                                   messageable as beacon_messageable, content as beacon_content, file as beacon_file,
+                                   webhook as beacon_webhook)
 
 class FluxerMessageContent:
     def __init__(self, content: str | None = None, files: list[fluxer.File] | None = None,
@@ -44,7 +44,7 @@ class FluxerMessageContent:
         return self._files
 
     @property
-    def embeds(self) -> list[stoat_embed.Embed]:
+    def embeds(self) -> list[fluxer.Embed]:
         return self._embeds
 
     @property
@@ -59,7 +59,7 @@ class FluxerBeaconContentBlockConverter:
         return block.content
 
     @staticmethod
-    def embed(block: beacon_content.BeaconContentEmbed) -> stoat_embed.Embed:
+    def embed(block: beacon_content.BeaconContentEmbed) -> fluxer.Embed:
         """Converts a BeaconContentEmbed to a discord.Embed object."""
 
         # Create embed
@@ -107,10 +107,10 @@ class FluxerBeaconFilesConverter:
 
 class FluxerDriver(beacon_driver.BeaconDriver):
     def __init__(self, bot, message_cache: beacon_messages.BeaconMessageCache):
-        super().__init__("stoat", bot, message_cache)
+        super().__init__("fluxer", bot, message_cache)
 
         # Overwrite self.bot (to set typing)
-        self.bot: fluxer.Bot | fluxer.Client = bot
+        self._bot: fluxer.Bot | fluxer.Client = bot
 
         # Enable age-gate
         self._supports_agegate = True
@@ -182,6 +182,17 @@ class FluxerDriver(beacon_driver.BeaconDriver):
             attachments=len(message.attachments),
             replies=replies,
             webhook_id=None
+        )
+
+    def _to_beacon_webhook(self, webhook: fluxer.Webhook) -> beacon_webhook.BeaconWebhook:
+        server = self.get_server(str(webhook.guild_id))
+        channel = self.get_channel(server, str(webhook.channel_id))
+
+        return beacon_webhook.BeaconWebhook(
+            webhook_id=str(webhook.id),
+            platform=self.platform,
+            server=server,
+            channel=channel
         )
 
     @staticmethod
@@ -274,7 +285,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         if not fluxer_server:
             return None
 
-        member = fluxer_server.get_member(member_id)
+        member = fluxer_server.get_member(int(member_id))
 
         if not member:
             return None
@@ -287,7 +298,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         if not fluxer_server:
             return None
 
-        channel = fluxer_server.get_channel(channel_id)
+        channel = fluxer_server.get_channel(int(channel_id))
 
         if not channel:
             return None
@@ -306,6 +317,22 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         server = await self.bot.fetch_guild(server_id)
 
         return self._to_beacon_server(server)
+
+    def get_webhook(self, webhook_id: str):
+        webhook = self._webhooks.get_webhook(webhook_id)
+
+        if not webhook:
+            return None
+
+        return self._to_beacon_webhook(webhook)
+
+    async def fetch_webhook(self, webhook_id: str):
+        webhook = await self.bot.fetch_webhook(int(webhook_id))
+
+        # Store webhook to cache
+        self._webhooks.store_webhook(str(webhook.id), webhook)
+
+        return self._to_beacon_webhook(webhook)
 
     # noinspection DuplicatedCode
     async def send(self, destination: beacon_messageable.BeaconMessageable,
@@ -352,7 +379,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         target = self.bot.get_channel(int(target_channel_id))
 
         # Convert channel to BeaconChannel
-        channel: beacon_channel.BeaconChannel = self.get_channel(self.get_server(str(target.guild.id)), str(target.id))
+        channel: beacon_channel.BeaconChannel = self.get_channel(self.get_server(str(target.guild_id)), str(target.id))
 
         # Are we self-sending?
         if target_channel_id == content.original_channel_id and not self_send:
@@ -362,7 +389,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 message_id=content.original_id,
                 platform=self.platform,
                 author=send_as or self_user,
-                server=self.get_server(str(target.guild.id)),
+                server=self.get_server(str(target.guild_id)),
                 channel=channel,
                 content=fluxer_content.raw_content,
                 attachments=len(fluxer_content.files),
@@ -397,7 +424,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
             message_id=str(message.id),
             platform=self.platform,
             author=send_as or self_user,
-            server=self.get_server(str(target.guild.id)),
+            server=self.get_server(str(target.guild_id)),
             channel=channel,
             content=fluxer_content.raw_content,
             attachments=len(fluxer_content.files),

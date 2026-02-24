@@ -195,7 +195,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         super().__init__("discord", bot, message_cache)
 
         # Overwrite self.bot (to set typing)
-        self.bot: bridge.Bot = bot
+        self._bot: bridge.Bot = bot
 
         # Enable age-gate
         self._supports_agegate = True

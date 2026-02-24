@@ -64,14 +64,27 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
             self.stoat_bot = self._driver.bot
             return
 
-        # Reserve driver
-        self._beacon.drivers.reserve_driver("stoat")
+        # Check if we can register Stoat
+        self.can_boot: bool = False
+        has_whitelist: bool = self._beacon.config.get("enable_platform_whitelist")
+        available_platforms: bool = self._beacon.config.get("enabled_platforms")
 
-        # Create driver
-        self._driver = stoat_driver.StoatDriver(self.stoat_bot, self._beacon.messages)
+        if (has_whitelist and "stoat" in available_platforms) or not has_whitelist:
+            self.can_boot = True
+
+            # Reserve driver
+            self._beacon.drivers.reserve_driver("stoat")
+
+            # Create driver
+            self._driver = stoat_driver.StoatDriver(self.stoat_bot, self._beacon.messages)
 
     async def run_stoat(self, token: str):
+        if not self.can_boot:
+            print("Stoat not whitelisted in Beacon config. Shutting down Stoat bot parent.")
+            return
+
         while True:
+            # noinspection PyBroadException
             try:
                 bot_needs_open: bool = (self.stoat_bot is None) or (self.stoat_bot.closed if self.stoat_bot else False)
                 if bot_needs_open:

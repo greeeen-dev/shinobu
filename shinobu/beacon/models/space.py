@@ -92,6 +92,50 @@ class BeaconSpaceInvite:
             used=data.get("uses", 0)
         )
 
+class BeaconPartialSpaceMember:
+    def __init__(self, platform: str, server_id: str, channel_id: str, webhook_id: str | None = None,
+                 invite: str | None = None):
+        self._platform: str = platform
+        self._server_id: str = server_id
+        self._channel_id: str = channel_id
+        self._webhook_id: str = webhook_id
+        self._invite: str | None = invite
+
+    @property
+    def platform(self) -> str:
+        return self._platform
+
+    @property
+    def server_id(self) -> str:
+        return self._server_id
+
+    @property
+    def channel_id(self) -> str:
+        return self._channel_id
+
+    @property
+    def webhook_id(self) -> str | None:
+        return self._webhook_id
+
+    @property
+    def invite(self) -> BeaconSpaceInvite | str | None:
+        return self._invite
+
+    def __eq__(self, other):
+        if not isinstance(other, BeaconSpaceMember) and not isinstance(other, BeaconPartialSpaceMember):
+            return False
+
+        return self.server_id == other.server_id
+
+    def to_dict(self) -> dict:
+        return {
+            "platform": self.platform,
+            "server": self.server_id,
+            "channel": self.channel_id,
+            "invite": self.invite,
+            "webhook": self._webhook_id
+        }
+
 class BeaconSpaceMember:
     def __init__(self, platform: str, server: beacon_server.BeaconServer, channel: beacon_channel.BeaconChannel,
                  webhook: str | None = None, invite: str | None = None):
@@ -130,7 +174,7 @@ class BeaconSpaceMember:
         return self._invite
     
     def __eq__(self, other):
-        if not isinstance(other, BeaconSpaceMember):
+        if not isinstance(other, BeaconSpaceMember) and not isinstance(other, BeaconPartialSpaceMember):
             return False
 
         return self.server_id == other.server_id
@@ -146,13 +190,15 @@ class BeaconSpaceMember:
 
 class BeaconSpace:
     def __init__(self, space_id: str, space_name: str, space_emoji: str | None = None, members: list | None = None,
-                 invites: list | None = None, bans: list | None = None, private: bool = False, nsfw: bool = False,
-                 private_owner_id: str | None = None, relay_deletes: bool = True, relay_edits: bool = True,
-                 relay_large_attachments: bool = True, filters: list | None = None, filter_configs: dict | None = None):
+                 partial_members: list| None = None, invites: list | None = None, bans: list | None = None,
+                 private: bool = False, nsfw: bool = False, private_owner_id: str | None = None,
+                 relay_deletes: bool = True, relay_edits: bool = True, relay_large_attachments: bool = True,
+                 filters: list | None = None, filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
         self._emoji: str = space_emoji
         self._members: list[BeaconSpaceMember] = members or []
+        self._partial_members: list[BeaconPartialSpaceMember] = partial_members or []
         self._invites: list[BeaconSpaceInvite] = invites or []
         self._bans: list[str] = bans or []
 
@@ -181,6 +227,10 @@ class BeaconSpace:
     @property
     def members(self) -> list:
         return self._members
+
+    @property
+    def partial_members(self) -> list:
+        return self._partial_members
 
     @property
     def invites(self) -> list:
@@ -238,7 +288,7 @@ class BeaconSpace:
         return server.id in self._bans
 
     def join(self, server: beacon_server.BeaconServer, channel: beacon_channel.BeaconChannel,
-             webhook: beacon_webhook.BeaconWebhook | None = None, invite: BeaconSpaceInvite | None = None,
+             webhook: beacon_webhook.BeaconWebhook | str | None = None, invite: BeaconSpaceInvite | None = None,
              force: bool = False):
         """Joins a Space."""
 
@@ -247,7 +297,7 @@ class BeaconSpace:
             platform=server.platform,
             server=server,
             channel=channel,
-            webhook=webhook,
+            webhook=webhook.id if type(webhook) is beacon_webhook.BeaconWebhook else webhook,
             invite=invite.code if invite else None
         )
         
@@ -282,6 +332,26 @@ class BeaconSpace:
         # Join space
         self._members.append(new_membership)
 
+    def partial_join(self, platform: str, server_id: str, channel_id: str, webhook_id: str, invite: str | None = None):
+        """Joins as a partial member. This is only to be used for restore operations
+        when the platform driver isn't available."""
+
+        # Create new partial membership object
+        new_membership: BeaconPartialSpaceMember = BeaconPartialSpaceMember(
+            platform=platform,
+            server_id=server_id,
+            channel_id=channel_id,
+            webhook_id=webhook_id,
+            invite=invite
+        )
+
+        # Is the server a member already?
+        if new_membership in self._members or new_membership in self._partial_members:
+            raise BeaconSpaceAlreadyJoined("Already a member of this Space")
+
+        # Join space
+        self._partial_members.append(new_membership)
+
     def leave(self, member: BeaconSpaceMember):
         if member not in self._members:
             raise BeaconSpaceNotJoined("Server is not in this Space")
@@ -305,7 +375,7 @@ class BeaconSpace:
             "id": self.id,
             "name": self.name,
             "emoji": self.emoji,
-            "members": self.members.copy(),
+            "members": self.members.copy() + self.partial_members.copy(),
             "invites": self.invites.copy(),
             "bans": self.bans.copy(),
             "options": {

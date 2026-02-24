@@ -38,18 +38,27 @@ class BeaconMessageBlockedReason(Enum):
     bridge_paused = 1
     filter_blocked = 2
 
+class BeaconNotInit(Exception):
+    def __init__(self):
+        super().__init__("The resource is not available because Beacon isn't ready yet.")
+
 class Beacon:
-    def __init__(self, bot: bridge.Bot, files_wrapper: fine_grained.FineGrainedSecureFiles, enable_multi: bool = True):
+    def __init__(self, bot: bridge.Bot, files_wrapper: fine_grained.FineGrainedSecureFiles, config: dict | None = None,
+                 enable_multi: bool = True):
         self._enable_multi: bool = enable_multi and False # We'll clamp this to False for now
         self.__wrapper: fine_grained.FineGrainedSecureFiles = files_wrapper
         self.__bot: bridge.Bot = bot
+        self._config: dict = config or {}
         self._init: bool = False
 
         # Get data
         self._data: dict = self.__wrapper.read_json("beacon").get("raw", {})
 
         # Initialize managers
-        self._drivers: beacon_drivers.BeaconDriverManager = beacon_drivers.BeaconDriverManager()
+        self._drivers: beacon_drivers.BeaconDriverManager = beacon_drivers.BeaconDriverManager(
+            self._config.get("enable_platform_whitelist", False),
+            self._config.get("enabled_platforms")
+        )
         self._spaces: beacon_spaces.BeaconSpaceManager = beacon_spaces.BeaconSpaceManager()
         self._messages: beacon_messages.BeaconMessageCache = beacon_messages.BeaconMessageCache(self.__wrapper)
         self._filters: beacon_filters.BeaconFilterManager = beacon_filters.BeaconFilterManager()
@@ -63,6 +72,10 @@ class Beacon:
     @property
     def initialized(self) -> bool:
         return self._init
+
+    @property
+    def config(self) -> dict:
+        return self._config
 
     @property
     def drivers(self) -> beacon_drivers.BeaconDriverManager:
@@ -154,6 +167,17 @@ class Beacon:
             for member in space_data.get("members"):
                 platform_driver: beacon_driver.BeaconDriver = self.drivers.get_driver(member["platform"])
 
+                if not platform_driver:
+                    # Join as "partial" member
+                    space.partial_join(
+                        platform=member["platform"],
+                        server_id=member["server"],
+                        channel_id=member["channel"],
+                        webhook_id=member["webhook"],
+                        invite=member["invite"]
+                    )
+                    continue
+
                 # Get server
                 server: beacon_server.BeaconServer | None = platform_driver.get_server(member["server"])
 
@@ -189,6 +213,9 @@ class Beacon:
         print("Beacon is ready!")
 
     def save_data(self):
+        if not self.initialized:
+            raise BeaconNotInit()
+
         # Assemble data dict
         data: dict = {
             "spaces": self._spaces.to_dict(),
@@ -200,6 +227,9 @@ class Beacon:
     async def can_send(self, author: beacon_member.BeaconMember,
                         space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
                         webhook_id: str | None = None, skip_filter: bool = False) -> BeaconMessageBlockedReason | None:
+        if not self.initialized:
+            raise BeaconNotInit()
+
         # Get bridge paused data
         bridge_paused: dict = self._data.get("bridge_paused", {})
 
@@ -303,6 +333,9 @@ class Beacon:
                    content: beacon_message.BeaconMessageContent, webhook_id: str | None = None
                    ) -> beacon_message.BeaconMessageGroup:
         """Sends a message to a Space."""
+
+        if not self.initialized:
+            raise BeaconNotInit()
 
         # Ensure we can send the message
         blocking_condition: BeaconMessageBlockedReason | None = await self.can_send(author, space, content, webhook_id)

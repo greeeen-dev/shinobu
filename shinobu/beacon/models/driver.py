@@ -140,6 +140,10 @@ class BeaconDriver:
         return self._platform
 
     @property
+    def bot(self):
+        return self._bot
+
+    @property
     def supports_multi(self) -> bool:
         """Whether the driver supports multicore execution via aiomultiprocess."""
         return self._supports_multi and self._supports_async

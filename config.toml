@@ -1,0 +1,3 @@
+[beacon]
+enable_platform_whitelist = true
+enabled_platforms = ["discord", "stoat"]

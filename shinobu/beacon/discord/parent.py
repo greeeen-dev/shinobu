@@ -178,6 +178,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
     async def on_message(self, message: discord.Message):
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
+        # noinspection DuplicatedCode
         if message.content.startswith(self.bot.command_prefix):
             # Assume this is a text command
             return
@@ -193,6 +194,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             if not webhook:
                 try:
                     webhook = await self.bot.fetch_webhook(message.webhook_id)
+                    origin_driver.webhooks.store_webhook(str(webhook.id), webhook)
                 except discord.HTTPException:
                     pass
 

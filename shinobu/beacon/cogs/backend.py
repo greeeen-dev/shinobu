@@ -39,7 +39,7 @@ class BeaconBackend(shinobu_cog.ShinobuCog):
             # Beacon already initialized
             return
 
-        self._beacon = beacon.Beacon(self.bot, self._shinobu_files)
+        self._beacon = beacon.Beacon(self.bot, self._shinobu_files, config=self.bot.config.get("beacon"))
         self.bot.shared_objects.add("beacon", self._beacon)
 
     @commands.Cog.listener()

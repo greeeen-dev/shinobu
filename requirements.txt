@@ -9,4 +9,5 @@ jellyfish
 tld
 better-profanity
 stoat.py
+aiohttp
 git+https://github.com/greeeen-dev/capacitor.git

@@ -34,6 +34,10 @@ class FluxerBot(fluxer.Bot):
     def register_driver(self):
         self._beacon.drivers.register_driver("fluxer", self._driver)
 
+    @property
+    def beacon(self) -> beacon.Beacon:
+        return self._beacon
+
 class FluxerDriverParent(shinobu_cog.ShinobuCog):
     def __init__(self, bot):
         # Register cog metadata
@@ -59,17 +63,34 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
             self.fluxer_bot = self._driver.bot
             return
 
-        # Reserve driver
-        self._beacon.drivers.reserve_driver("fluxer")
+        # Check if we can register Stoat
+        self.can_boot: bool = False
+        has_whitelist: bool = self._beacon.config.get("enable_platform_whitelist")
+        available_platforms: bool = self._beacon.config.get("enabled_platforms")
 
-        # Create driver
-        self._driver = fluxer_driver.FluxerDriver(self.fluxer_bot, self._beacon.messages)
+        if (has_whitelist and "fluxer" in available_platforms) or not has_whitelist:
+            self.can_boot = True
+
+            # Reserve driver
+            self._beacon.drivers.reserve_driver("fluxer")
+
+            # Create driver
+            self._driver = fluxer_driver.FluxerDriver(self.fluxer_bot, self._beacon.messages)
+
+    @property
+    def beacon(self) -> beacon.Beacon:
+        return self._beacon
 
     async def run_fluxer(self, token: str):
+        if not self.can_boot:
+            print("Fluxer not whitelisted in Beacon config. Shutting down Fluxer bot parent.")
+            return
+
         while True:
             # noinspection PyBroadException
             try:
-                bot_needs_open: bool = (self.fluxer_bot is None) or (self.fluxer_bot.closed if self.fluxer_bot else False)
+                # noinspection PyProtectedMember
+                bot_needs_open: bool = (self.fluxer_bot is None) or (self.fluxer_bot._closed if self.fluxer_bot else False)
                 if bot_needs_open:
                     # Create new bot
                     self.fluxer_bot: FluxerBot | fluxer.Bot = FluxerBot(
@@ -77,10 +98,13 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                         self._driver,
                         command_prefix=self.bot.command_prefix
                     )
+
                     self._driver.replace_bot(self.fluxer_bot)
+                    print(self._driver.bot)
 
                 # Load events cog
                 await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.events")
+                await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.frontend")
 
                 # Run bot
                 # noinspection PyBroadException
@@ -88,6 +112,15 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                     await self.fluxer_bot.start(token)
                 except (KeyboardInterrupt, asyncio.exceptions.CancelledError):
                     # Exit loop
+                    break
+                except fluxer.errors.Forbidden:
+                    # Unreserve/unregister driver
+                    self._beacon.drivers.unreserve_driver("fluxer")
+                    self._beacon.drivers.remove_driver("fluxer", silent=True)
+
+                    traceback.print_exc()
+                    print("Got 403 from Fluxer. Shutting down Fluxer bot parent.")
+                    print("Your network may be being restricted from connecting to Fluxer.")
                     break
                 except:
                     traceback.print_exc()
