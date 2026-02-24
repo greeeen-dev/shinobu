@@ -229,14 +229,13 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
         # Get Space
         space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
+        if not space:
+            # We can't bridge
+            return
 
         # Get the ID of the webhook to use
         membership: beacon_space.BeaconSpaceMember = space.get_member(server)
         webhook_id = membership.webhook_id
-
-        if not space:
-            # We can't bridge
-            return
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
