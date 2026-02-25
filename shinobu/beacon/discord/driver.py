@@ -405,8 +405,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 file_block_files.append(discord_file)
 
         # Dynamically set Components V2
-        if not has_reply and len(legacy_embeds) > 0 and len(files) == 0:
-            # Keep embeds as original as possible by not using Components v2
+        if not has_reply and len(files) == 0:
+            # Keep content as original as possible by not using Components v2
             use_components_v2 = False
 
         # Assemble to DiscordMessageContent
