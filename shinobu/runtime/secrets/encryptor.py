@@ -23,11 +23,17 @@ import string
 import argon2
 import psutil
 from Crypto.Protocol.KDF import PBKDF2
-from Crypto.Cipher import AES
+from Crypto.Cipher import AES, ChaCha20_Poly1305
 from Crypto import Hash
 from Crypto import Random as CryptoRandom
 
 available_mib: int = psutil.virtual_memory().total / 1048576
+
+# Available algorithms
+algo_available: list = [
+    "aes-256-gcm",
+    "xchacha20-poly1305" # Recommended
+]
 
 # Available KDFs
 kdf_available: list = [
@@ -58,13 +64,14 @@ if available_mib >= 2048:
     # Enable high-memory profile
     argon2_available.append("argon2_high")
 
-class GCMEncryptedData:
-    def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, kdf: str | None = None,
+class EncryptedData:
+    def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, algorithm: str, kdf: str | None = None,
                  profile: str | None = None):
         self._ciphertext: str = ciphertext
         self._tag: str = tag
         self._nonce: str = nonce
         self._salt: str = salt
+        self._algorithm: str = algorithm
         self._kdf: str = kdf or "pbkdf2"
         self._profile: str = profile or "pbkdf2_hmac_sha_1"
         self._outdated: bool = False
@@ -95,6 +102,10 @@ class GCMEncryptedData:
         return self._salt
 
     @property
+    def algorithm(self) -> str:
+        return self._algorithm
+
+    @property
     def kdf(self) -> str:
         return self._kdf
 
@@ -113,12 +124,38 @@ class GCMEncryptedData:
             "tag": self.tag,
             "nonce": self.nonce,
             "salt": self.salt,
+            "algorithm": self.algorithm,
             "kdf": self.kdf,
             "profile": self.profile
         }
 
     @classmethod
+    def from_dict(cls, data: dict) -> 'EncryptedData':
+        if data.get("algorithm"):
+            if data["algorithm"] not in algo_available:
+                raise ValueError("Unsupported algorithm")
+
+        return cls(
+            ciphertext=data["ciphertext"],
+            tag=data["tag"],
+            nonce=data["nonce"],
+            salt=data["salt"],
+            algorithm=data.get("algorithm", "aes-256-gcm"),
+            kdf=data.get("kdf", "pbkdf2"),
+            profile=data.get("profile")
+        )
+
+class GCMEncryptedData(EncryptedData):
+    def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, kdf: str | None = None,
+                 profile: str | None = None):
+        super().__init__(ciphertext, tag, nonce, salt, "aes-256-gcm", kdf=kdf, profile=profile)
+
+    @classmethod
     def from_dict(cls, data: dict) -> 'GCMEncryptedData':
+        if data.get("algorithm"):
+            if data["algorithm"] != "aes-256-gcm":
+                raise ValueError("Not encrypted using AES-256-GCM")
+
         return cls(
             ciphertext=data["ciphertext"],
             tag=data["tag"],
@@ -128,9 +165,37 @@ class GCMEncryptedData:
             profile=data.get("profile")
         )
 
-class GCMEncryptor:
+
+class XChaCha20EncryptedData(EncryptedData):
+    def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, kdf: str | None = None,
+                 profile: str | None = None):
+        super().__init__(ciphertext, tag, nonce, salt, "xchacha20-poly1305", kdf=kdf, profile=profile)
+
+    @classmethod
+    def from_dict(cls, data: dict) -> 'XChaCha20EncryptedData':
+        if data.get("algorithm") != "xchacha20-poly1305":
+            raise ValueError("Not encrypted using XChaCha20-Poly1305")
+
+        return cls(
+            ciphertext=data["ciphertext"],
+            tag=data["tag"],
+            nonce=data["nonce"],
+            salt=data["salt"],
+            kdf=data.get("kdf", "pbkdf2"),
+            profile=data.get("profile")
+        )
+
+class BaseEncryptor:
     @staticmethod
-    def derive_password_hash(password: str, salt: bytes, kdf: str = "argon2", profile: str | None = None):
+    def decode_base64(data: EncryptedData):
+        nonce: bytes = base64.b64decode(data.nonce)
+        tag: bytes = base64.b64decode(data.tag)
+        salt: bytes = base64.b64decode(data.salt)
+        ciphertext: bytes = base64.b64decode(data.ciphertext)
+        return nonce, tag, salt, ciphertext
+
+    @staticmethod
+    def derive_password_hash(password: str, salt: bytes, kdf: str = "argon2", profile: str | None = None) -> bytearray:
         if kdf and kdf not in kdf_available:
             raise ValueError("Invalid KDF")
 
@@ -143,7 +208,7 @@ class GCMEncryptor:
                 profile = "pbkdf2_hmac_sha_256"
 
         # Create password hash from selected KDF
-        hashed_password: bytes | None = None
+        hashed_password: bytearray | None = None
 
         if kdf == "argon2":
             if not profile in argon2_available:
@@ -151,7 +216,7 @@ class GCMEncryptor:
 
             argon2_profile: argon2.Parameters = argon2_profiles[profile]
 
-            hashed_password = argon2.low_level.hash_secret_raw(
+            hashed_password = bytearray(argon2.low_level.hash_secret_raw(
                 secret=password.encode(),
                 salt=salt,
                 time_cost=argon2_profile.time_cost,
@@ -160,18 +225,26 @@ class GCMEncryptor:
                 hash_len=argon2_profile.hash_len,
                 type=argon2_profile.type,
                 version=argon2_profile.version
-            )
+            ))
         elif kdf == "pbkdf2":
             if not profile in pbkdf2_profiles:
                 raise ValueError("PBKDF2 profile not available")
 
-            hashed_password = PBKDF2(password, salt, dkLen=32, count=600000, hmac_hash_module=pbkdf2_profiles[profile])
+            hashed_password = bytearray(PBKDF2(
+                password,
+                salt,
+                dkLen=32,
+                count=600000,
+                hmac_hash_module=pbkdf2_profiles[profile]
+            ))
 
         return hashed_password
 
+class GCMEncryptor(BaseEncryptor):
     @staticmethod
-    def encrypt(plaintext_data: str, password: str, kdf: str = "argon2", profile: str | None = None):
-        """Encrypts a given string and returns encrypted data in base64 format."""
+    def encrypt(plaintext_data: str, password: str, kdf: str = "argon2", profile: str | None = None
+                ) -> GCMEncryptedData:
+        """Encrypts a given string and returns encrypted data."""
         if kdf and kdf not in kdf_available:
             raise ValueError("Invalid KDF")
 
@@ -189,11 +262,17 @@ class GCMEncryptor:
         encoded: bytes = plaintext_data.encode()
 
         # Create password hash from selected KDF
-        __key: bytes = GCMEncryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
+        key: bytearray = GCMEncryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
 
         # Create encryption key
-        __cipher = AES.new(__key, AES.MODE_GCM, nonce=nonce)
-        result, tag = __cipher.encrypt_and_digest(encoded)
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+
+        # Get ciphertext and tag
+        result, tag = cipher.encrypt_and_digest(encoded)
+
+        # Clear password hash
+        for index in range(len(key)):
+            key[index] = 0
 
         # Return GCMEncryptedData object
         return GCMEncryptedData(
@@ -206,39 +285,148 @@ class GCMEncryptor:
         )
 
     @staticmethod
-    def decrypt(data: GCMEncryptedData, password: str):
+    def decrypt(data: GCMEncryptedData | EncryptedData, password: str):
         """Decrypts a given encrypted object."""
         # Decode base64 strings to bytes
-        nonce: bytes = base64.b64decode(data.nonce)
-        tag: bytes = base64.b64decode(data.tag)
-        salt: bytes = base64.b64decode(data.salt)
-        ciphertext: bytes = base64.b64decode(data.ciphertext)
+        if data.algorithm != "aes-256-gcm":
+            raise ValueError("Algorithm mismatch")
+
+        nonce, tag, salt, ciphertext = BaseEncryptor.decode_base64(data)
 
         # Create password hash from selected KDF
-        __key: bytes | None = None
         kdf: str = data.kdf
         profile: str = data.profile
 
         # Generate key
-        __key = GCMEncryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
-        __cipher = AES.new(__key, AES.MODE_GCM, nonce=nonce)
+        key: bytearray = GCMEncryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
+        cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
 
-        # Return result
-        result: bytes = __cipher.decrypt_and_verify(ciphertext, tag)
+        # Get result
+        result: bytes = cipher.decrypt_and_verify(ciphertext, tag)
+
+        # Clear password hash
+        for index in range(len(key)):
+            key[index] = 0
+
         return result.decode()
+
+class XChaCha20Encryptor(BaseEncryptor):
+    @staticmethod
+    def encrypt(plaintext_data: str, password: str, kdf: str = "argon2", profile: str | None = None
+                ) -> XChaCha20EncryptedData:
+        """Encrypts a given string and returns encrypted data."""
+        if kdf and kdf not in kdf_available:
+            raise ValueError("Invalid KDF")
+
+        # Get KDF profile
+        if not profile:
+            if kdf == "argon2":
+                # For compatibility sake, we will use second-recommended Argon2 profile
+                profile = "argon2_low"
+            elif kdf == "pbkdf2":
+                profile = "pbkdf2_hmac_sha_256"
+
+        # Generate random salt and nonce
+        salt: bytes = CryptoRandom.get_random_bytes(16)
+        nonce: bytes = CryptoRandom.get_random_bytes(24)
+        encoded: bytes = plaintext_data.encode()
+
+        # Create password hash from selected KDF
+        key: bytearray = XChaCha20Encryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
+
+        # Create encryption key
+        cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce)
+
+        # Get ciphertext and tag
+        result, tag = cipher.encrypt_and_digest(encoded)
+
+        # Clear password hash
+        for index in range(len(key)):
+            key[index] = 0
+
+        # Return GCMEncryptedData object
+        return XChaCha20EncryptedData(
+            ciphertext=base64.b64encode(result).decode('ascii'),
+            tag=base64.b64encode(tag).decode('ascii'),
+            nonce=base64.b64encode(nonce).decode('ascii'),
+            salt=base64.b64encode(salt).decode('ascii'),
+            kdf=kdf,
+            profile=profile
+        )
+
+    @staticmethod
+    def decrypt(data: XChaCha20EncryptedData | EncryptedData, password: str):
+        """Decrypts a given encrypted object."""
+        if data.algorithm != "xchacha20-poly1305":
+            raise ValueError("Algorithm mismatch")
+
+        # Decode base64 strings to bytes
+        nonce, tag, salt, ciphertext = BaseEncryptor.decode_base64(data)
+
+        # Create password hash from selected KDF
+        kdf: str = data.kdf
+        profile: str = data.profile
+
+        # Generate key
+        key: bytearray = XChaCha20Encryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
+        cipher = ChaCha20_Poly1305.new(key=key, nonce=nonce)
+
+        # Get result
+        result: bytes = cipher.decrypt_and_verify(ciphertext, tag)
+
+        # Clear password hash
+        for index in range(len(key)):
+            key[index] = 0
+
+        return result.decode()
+
+class AutoEncryptor:
+    """An encryptor that encrypts and decrypts data using multiple algorithms."""
+    @staticmethod
+    def encrypt(plaintext_data: str, password: str, algorithm: str = "xchacha20-poly1305", kdf: str = "argon2",
+                profile: str | None = None) -> EncryptedData:
+        if algorithm not in algo_available:
+            raise ValueError(f"Invalid algorithm {algorithm}")
+
+        if algorithm == "xchacha20-poly1305":
+            return XChaCha20Encryptor.encrypt(plaintext_data, password, kdf=kdf, profile=profile)
+        else:
+            # Fallback to AES-256-GCM (although this should've been handled)
+            return GCMEncryptor.encrypt(plaintext_data, password, kdf=kdf, profile=profile)
+
+    @staticmethod
+    def decrypt(data: EncryptedData, password: str) -> str:
+        if data.algorithm not in algo_available:
+            raise ValueError(f"Invalid algorithm {data.algorithm}")
+
+        if data.algorithm == "xchacha20-poly1305":
+            return XChaCha20Encryptor.decrypt(data, password)
+        else:
+            # Fallback to AES-256-GCM (although this should've been handled)
+            return GCMEncryptor.decrypt(data, password)
 
 # Debug mode (generate a testing-only encryptor)
 if __name__ == "__main__":
     random_plaintext_length = 100
-    encryptor = GCMEncryptor()
+    encryptor = AutoEncryptor()
+
+    # Set algorithm here
+    algo = "xchacha20-poly1305"
+
+    algo_mapping = {
+        "aes-256-gcm": "GCM",
+        "xchacha20-poly1305": "XChaCha20"
+    }
 
     # Generate plaintext
     plaintext = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(random_plaintext_length)])
-    print(f"Testing GCMEncryptor encryption with {len(plaintext)}-char plaintext with password 'password'...")
+    print(f"Testing {algo_mapping[algo]}Encryptor encryption with {len(plaintext)}-char plaintext with password 'password'...")
 
     # Test encryption
     stime = time.time()
-    encrypted_data: GCMEncryptedData = encryptor.encrypt(plaintext, "password", kdf="argon2", profile="argon2_low")
+    encrypted_data: EncryptedData = encryptor.encrypt(
+        plaintext, "password", algorithm=algo, kdf="argon2", profile="argon2_low"
+    )
     etime = time.time() - stime
 
     # Test decryption
@@ -252,6 +440,7 @@ if __name__ == "__main__":
     print(f"- tag: {encrypted_data.tag}")
     print(f"- nonce: {encrypted_data.nonce}")
     print(f"- salt: {encrypted_data.salt}")
+    print(f"- algorithm: {encrypted_data.algorithm}")
     print(f"- kdf: {encrypted_data.kdf}")
     print(f"- kdf profile: {encrypted_data.profile}")
     print(f"- duration: {round(etime * 1000, 2)}ms")

@@ -28,12 +28,12 @@ class RawEncryptor:
     """A raw encryptor"""
     def __init__(self, password):
         self.__password = password
-        self.__encryptor: encryptor.GCMEncryptor = encryptor.GCMEncryptor()
+        self.__encryptor: encryptor.AutoEncryptor = encryptor.AutoEncryptor()
 
-    def encrypt(self, data) -> encryptor.GCMEncryptedData:
+    def encrypt(self, data) -> encryptor.EncryptedData:
         return self.__encryptor.encrypt(data, self.__password)
 
-    def decrypt(self, encrypted_data: encryptor.GCMEncryptedData) -> str:
+    def decrypt(self, encrypted_data: encryptor.EncryptedData) -> str:
         return self.__encryptor.decrypt(encrypted_data, self.__password)
 
 class TokenStore:
@@ -43,7 +43,7 @@ class TokenStore:
     def __init__(self, password: str, filename: str | None = None, debug: bool = False,
                  content_override: dict | None = None, onetime: list | None = None, read_only: bool = True,
                  write_only: bool = False):
-        self.__encryptor: encryptor.GCMEncryptor = encryptor.GCMEncryptor()
+        self.__encryptor: encryptor.AutoEncryptor = encryptor.AutoEncryptor()
         self.__password: str = password
         self.__filename: str = filename or '.secrets.json'
         self.__one_time: list = copy.copy(onetime) if onetime else []
@@ -98,7 +98,7 @@ class TokenStore:
 
     @property
     def needs_reencryption(self) -> bool:
-        test_data: encryptor.GCMEncryptedData = encryptor.GCMEncryptedData.from_dict(self.__data['test'])
+        test_data: encryptor.EncryptedData = encryptor.EncryptedData.from_dict(self.__data['test'])
         return test_data.outdated
 
     def load(self, filename: str | None = None):
@@ -111,7 +111,7 @@ class TokenStore:
     def _create_test_key(self):
         """Creates a test key for decryption testing."""
         if not 'test' in self.__data.keys():
-            encrypted_data: encryptor.GCMEncryptedData = self.__encryptor.encrypt(
+            encrypted_data: encryptor.EncryptedData = self.__encryptor.encrypt(
                 ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(16)]),
                 self.__password
             )
@@ -124,7 +124,7 @@ class TokenStore:
 
         # noinspection PyBroadException
         try:
-            test_data: encryptor.GCMEncryptedData = encryptor.GCMEncryptedData.from_dict(self.__data['test'])
+            test_data: encryptor.EncryptedData = encryptor.EncryptedData.from_dict(self.__data['test'])
             self.__encryptor.decrypt(test_data, password or self.__password)
         except:
             # We have an error here, perhaps the password is wrong?
@@ -153,7 +153,7 @@ class TokenStore:
             self.__accessed.append(identifier)
 
         # Create encrypted data object
-        data: encryptor.GCMEncryptedData = encryptor.GCMEncryptedData.from_dict(self.__data[identifier])
+        data: encryptor.EncryptedData = encryptor.EncryptedData.from_dict(self.__data[identifier])
 
         # Decrypt and return
         return self.__encryptor.decrypt(data, self.__password)
@@ -176,7 +176,7 @@ class TokenStore:
             raise KeyError('Secret already exists')
 
         # Encrypt and save token
-        encrypted_data = encryptor.GCMEncryptedData = self.__encryptor.encrypt(token, self.__password)
+        encrypted_data = encryptor.EncryptedData = self.__encryptor.encrypt(token, self.__password)
         self.__data.update({identifier: encrypted_data.to_dict()})
         self.save()
         return len(self.__data)
@@ -199,7 +199,7 @@ class TokenStore:
             raise ValueError('Cannot replace token, this is needed for password verification')
 
         # Get new data
-        encrypted_data: encryptor.GCMEncryptedData = self.__encryptor.encrypt(token, self.__password)
+        encrypted_data: encryptor.EncryptedData = self.__encryptor.encrypt(token, self.__password)
 
         # Overwrite old secret
         self.__data.update({identifier: encrypted_data.to_dict()})
@@ -245,7 +245,7 @@ class TokenStore:
         # Re-encrypt everything
         for key in self.__data.keys():
             token = self.retrieve(key)
-            encrypted: encryptor.GCMEncryptedData = self.__encryptor.encrypt(token, password)
+            encrypted: encryptor.EncryptedData = self.__encryptor.encrypt(token, password)
             self.__data[key] = encrypted.to_dict()
 
         self.__password = password

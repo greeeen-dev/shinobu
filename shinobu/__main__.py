@@ -279,7 +279,7 @@ class SecretsIssuingAuthority:
             # Return empty file
             return ""
 
-        encrypted_data = encryptor.GCMEncryptedData.from_dict(data)
+        encrypted_data = encryptor.EncryptedData.from_dict(data)
 
         # Decrypt file
         return raw_encryptor.decrypt(encrypted_data)
@@ -289,7 +289,7 @@ class SecretsIssuingAuthority:
         self._check_file_entitlement(wrapper, filename)
 
         # Encrypt data
-        encrypted_data: encryptor.GCMEncryptedData = raw_encryptor.encrypt(data)
+        encrypted_data: encryptor.EncryptedData = raw_encryptor.encrypt(data)
 
         # Save encrypted data
         with open(f"data/{filename}.json", 'w+') as file:

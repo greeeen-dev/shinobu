@@ -205,9 +205,9 @@ class ShinobuSecretsCLI:
             except (FileNotFoundError, JSONDecodeError):
                 continue
 
-            encrypted_data: encryptor.GCMEncryptedData = encryptor.GCMEncryptedData.from_dict(data)
+            encrypted_data: encryptor.EncryptedData = encryptor.EncryptedData.from_dict(data)
             decrypted_data: str = self._encryptor.decrypt(encrypted_data)
-            new_encrypted_data: encryptor.GCMEncryptedData = new_encryptor.encrypt(decrypted_data)
+            new_encrypted_data: encryptor.EncryptedData = new_encryptor.encrypt(decrypted_data)
             new_data: dict = new_encrypted_data.to_dict()
 
             with open(f'data/{file}.json', 'w+') as datafile:
