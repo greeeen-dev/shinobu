@@ -470,7 +470,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         for potential_mention in (content.split("<:") + content.split("<a:")):
             components = potential_mention.split('>')[0].split(':')
             if len(components) > 1:
-                emoji_mentions.append(components[1])
+                emoji_mentions.append({"name": components[0], "id": components[1]})
 
         for user_mention in user_mentions:
             # Check if this is a role mention
@@ -504,7 +504,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         for emoji_mention in emoji_mentions:
             try:
-                emoji = self.bot.get_emoji(int(emoji_mention))
+                emoji = self.bot.get_emoji(int(emoji_mention["id"]))
             except ValueError:
                 # This is not a valid snowflake
                 continue
@@ -517,9 +517,9 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             else:
                 # Assume emoji can be both animated or static
                 content = content.replace(
-                    f"<a:{emoji.name}:{emoji_mention}>", f":{emoji.name}:"
+                    f"<a:{emoji_mention['name']}:{emoji_mention['id']}>", f":{emoji_mention['name']}:"
                 ).replace(
-                    f"<:{emoji.name}:{emoji_mention}>", f":{emoji.name}:"
+                    f"<:{emoji_mention['name']}:{emoji_mention['id']}>", f":{emoji_mention['name']}:"
                 )
 
         return content
