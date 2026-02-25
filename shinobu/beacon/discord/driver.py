@@ -467,7 +467,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         channel_mentions = [item.split('>')[0] for item in content.split("<#")] if len(content.split("<#")) > 1 else []
         emoji_mentions = []
 
-        for potential_mention in (content.split("<:") + content.split("<:a")):
+        for potential_mention in (content.split("<:") + content.split("<a:")):
             components = potential_mention.split('>')[0].split(':')
             if len(components) > 0:
                 emoji_mentions.append(components[1])
