@@ -373,9 +373,6 @@ class Beacon:
         if not self.initialized:
             raise BeaconNotInit()
 
-        if content.empty:
-            return
-
         # Ensure we can send the message
         blocking_condition: BeaconMessageBlockedReason | None = await self.can_send(author, space, content, webhook_id)
 
