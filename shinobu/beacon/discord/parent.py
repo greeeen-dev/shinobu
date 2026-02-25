@@ -226,6 +226,9 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
         # Convert channel data to channel.BeaconChannel
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+        if not channel:
+            # We can't bridge
+            return
 
         # Get Space
         space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
