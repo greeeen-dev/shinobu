@@ -48,12 +48,13 @@ class FluxerEvents(cog.Cog):
             if embed.timestamp:
                 embed_block.timestamp = int(datetime.fromisoformat(embed.timestamp).timestamp())
 
-            for field in embed.fields:
-                embed_block.add_field(
-                    name=field["name"],
-                    value=field["value"],
-                    inline=field["inline"]
-                )
+            if embed.fields:
+                for field in embed.fields:
+                    embed_block.add_field(
+                        name=field["name"],
+                        value=field["value"],
+                        inline=field["inline"]
+                    )
 
             # Add to embed blocks
             embed_blocks.append(embed_block)

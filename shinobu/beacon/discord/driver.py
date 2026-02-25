@@ -466,9 +466,9 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         user_mentions = [item.split('>')[0] for item in content.split("<@")] if len(content.split("<@")) > 1 else []
         channel_mentions = [item.split('>')[0] for item in content.split("<#")] if len(content.split("<#")) > 1 else []
         emoji_mentions = [
-                             item.split('>')[0].split(':')[1] for item in content.split("<:")
+                             item.split('>')[0].split(':')[1] for item in content.split("<:") if len(item.split('>')[0].split(':')) > 0
                          ] if len(content.split("<:")) > 1 else [] + [
-                             item.split('>')[0].split(':')[1] for item in content.split("<a:")
+                             item.split('>')[0].split(':')[1] for item in content.split("<a:") if len(item.split('>')[0].split(':')) > 0
                          ] if len(content.split("<a:")) > 1 else []
 
         for user_mention in user_mentions:
