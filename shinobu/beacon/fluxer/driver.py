@@ -388,8 +388,13 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
         target = self.bot.get_channel(int(target_channel_id))
 
+        server: beacon_server.BeaconServer = self.get_server(str(target.guild_id))
+        if not server:
+            # Server is not cached here!
+            return
+
         # Convert channel to BeaconChannel
-        channel: beacon_channel.BeaconChannel = self.get_channel(self.get_server(str(target.guild_id)), str(target.id))
+        channel: beacon_channel.BeaconChannel = self.get_channel(server, str(target.id))
 
         # Are we self-sending?
         if target_channel_id == content.original_channel_id and not self_send:
