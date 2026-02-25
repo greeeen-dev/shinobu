@@ -367,7 +367,7 @@ class Beacon:
 
     async def send(self, author: beacon_member.BeaconMember, space: beacon_space.BeaconSpace,
                    content: beacon_message.BeaconMessageContent, webhook_id: str | None = None
-                   ) -> beacon_message.BeaconMessageGroup:
+                   ) -> beacon_message.BeaconMessageGroup | None:
         """Sends a message to a Space."""
 
         if not self.initialized:

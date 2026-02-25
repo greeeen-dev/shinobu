@@ -67,7 +67,7 @@ class BeaconMessageContent:
 
         if len(self.to_plaintext()) == 0 and len(self._files) == 0:
             # Check embed blocks
-            for block in self._blocks:
+            for _, block in self._blocks.items():
                 if type(block) is beacon_content.BeaconContentEmbed:
                     return False
 
