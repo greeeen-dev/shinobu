@@ -509,10 +509,18 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 # This is not a valid snowflake
                 continue
 
-            content = content.replace(
-                f"<a:{emoji.name}:{emoji_mention}>" if emoji.animated else f"<:{emoji.name}:{emoji_mention}>",
-                f":{emoji.name}:"
-            )
+            if emoji:
+                content = content.replace(
+                    f"<a:{emoji.name}:{emoji_mention}>" if emoji.animated else f"<:{emoji.name}:{emoji_mention}>",
+                    f":{emoji.name}:"
+                )
+            else:
+                # Assume emoji can be both animated or static
+                content = content.replace(
+                    f"<a:{emoji.name}:{emoji_mention}>", f":{emoji.name}:"
+                ).replace(
+                    f"<:{emoji.name}:{emoji_mention}>", f":{emoji.name}:"
+                )
 
         return content
 

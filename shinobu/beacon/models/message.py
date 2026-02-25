@@ -60,6 +60,21 @@ class BeaconMessageContent:
     def reply_attachments(self) -> int:
         return self._reply_attachments
 
+    @property
+    def empty(self) -> bool:
+        if len(self._blocks) == 0:
+            return True
+
+        if len(self.to_plaintext()) == 0 and len(self._files) == 0:
+            # Check embed blocks
+            for block in self._blocks:
+                if type(block) is beacon_content.BeaconContentEmbed:
+                    return False
+
+            return True
+
+        return False
+
     def add_block(self, block_id: str, block: beacon_content.BeaconContentBlock):
         if block_id in self._blocks:
             raise ValueError("Block already in blocks")
