@@ -469,7 +469,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         for potential_mention in (content.split("<:") + content.split("<a:")):
             components = potential_mention.split('>')[0].split(':')
-            if len(components) > 0:
+            if len(components) > 1:
                 emoji_mentions.append(components[1])
 
         for user_mention in user_mentions:
