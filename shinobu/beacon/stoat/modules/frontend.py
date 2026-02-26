@@ -39,7 +39,7 @@ class BeaconFrontend(commands.Gear):
 
     @bridge_text.command(name="new-space")
     @commands.is_owner()
-    async def new_space(self, ctx: commands.Context, name: str):
+    async def new_space(self, ctx: commands.Context, *, name: str):
         if ctx.author_id != "01G9EDYVA9PRTPF129VCDS81TS":
             return
 

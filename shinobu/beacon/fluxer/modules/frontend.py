@@ -33,7 +33,7 @@ class BeaconFrontend(cog.Cog):
         self._beacon: beacon.Beacon = self.bot.beacon
 
     @cog.Cog.command(name="new-space")
-    async def new_space(self, ctx: fluxer.Message, name: str):
+    async def new_space(self, ctx: fluxer.Message, *, name: str):
         if ctx.author.id != 1472271558005039139:
             return
 

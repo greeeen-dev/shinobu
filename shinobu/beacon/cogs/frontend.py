@@ -46,7 +46,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
     @bridge_text.command(name="new-space")
     @commands.is_owner() # Owner only for now for debugging purposes
-    async def new_space(self, ctx: commands.Context, name: str):
+    async def new_space(self, ctx: commands.Context, *, name: str):
         new_space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
             space_id=str(uuid.uuid4()),
             space_name=name
