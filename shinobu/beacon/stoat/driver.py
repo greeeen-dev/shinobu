@@ -126,7 +126,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
             platform=self.platform,
             name=user.name,
             display_name=user.display_name,
-            avatar_url=user.avatar.url if user.avatar else None
+            avatar_url=user.avatar.url() if user.avatar else None
         )
 
     def _to_beacon_member(self, member: stoat.Member) -> beacon_member.BeaconMember:
@@ -138,7 +138,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
             name=member.name,
             server=server,
             display_name=member.display_name,
-            avatar_url=member.avatar.url if member.avatar else None
+            avatar_url=member.avatar.url() if member.avatar else None
         )
 
     def _to_beacon_message(self, message: stoat.Message) -> beacon_message.BeaconMessage:

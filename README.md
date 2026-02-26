@@ -21,7 +21,7 @@ that's also flexible and ready for the demands of tomorrow.
 - [X] Shinobu Runtime (core, secrets manager, debug tools, etc)
 - [X] Basic Discord cross-server bridge (v0.1)
 - [X] Fluxer support (v0.2)
-- [ ] Stoat (formerly Revolt) support (v0.3)
+- [X] Stoat (formerly Revolt) support (v0.3)
 - [ ] Bridge cache backup and restore (v0.3)
 - [ ] Moderation & customization tools (v1)
 

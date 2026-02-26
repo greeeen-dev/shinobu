@@ -332,7 +332,7 @@ class Beacon:
     async def _edit_platform(self, driver: beacon_driver.BeaconDriver, message_group: beacon_message.BeaconMessageGroup,
                              content: beacon_message.BeaconMessageContent):
         platform_messages: list[beacon_message.BeaconMessage] = [
-            message for _, message in message_group.messages.items() if message.platform == driver.platform
+            message for _, message in message_group.messages.items() if message.platform == driver.platform and message.id != content.original_id
         ]
         tasks = []
 

@@ -23,14 +23,24 @@ from shinobu.beacon.models import (content as beacon_content, abc, user as beaco
 class BeaconMessageContent:
     def __init__(self, original_id: str, original_channel_id: str, blocks: dict[str, beacon_content.BeaconContentBlock],
                  files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None,
-                 reply_content: str | None = None, reply_attachments: int | None = None):
+                 reply_content: str | dict[str, int] | None = None, reply_attachments: int | dict[str, int] | None = None):
         self._original_id: str = original_id
         self._original_channel_id: str = original_channel_id
         self._blocks: dict[str, beacon_content.BeaconContentBlock] = blocks
         self._files: list[beacon_file.BeaconFile] = files or []
         self._replies: list[BeaconMessageGroup] = replies or []
-        self._reply_content: str | None = reply_content
-        self._reply_attachments: int = reply_attachments or 0
+        self._reply_content: dict | None = None
+        self._reply_attachments: dict | None = None
+
+        if type(reply_content) is str:
+            self._reply_content = {self._replies[0].id: reply_content}
+        else:
+            self._reply_content = reply_content
+
+        if type(reply_attachments) is int and reply_attachments:
+            self._reply_attachments = {self._replies[0].id: reply_attachments}
+        else:
+            self._reply_attachments = reply_attachments
 
     @property
     def original_id(self) -> str:
@@ -54,10 +64,20 @@ class BeaconMessageContent:
 
     @property
     def reply_content(self) -> str | None:
-        return self._reply_content
+        # For compatibility sake, we'll return the first result
+        return list(self._reply_content.values())[0]
 
     @property
     def reply_attachments(self) -> int:
+        # For compatibility sake, we'll return the first result
+        return list(self._reply_attachments.values())[0]
+
+    @property
+    def reply_content_all(self) -> dict | None:
+        return self._reply_content
+
+    @property
+    def reply_attachments_all(self) -> dict | None:
         return self._reply_attachments
 
     @property

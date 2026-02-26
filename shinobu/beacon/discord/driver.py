@@ -320,7 +320,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
             reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
             reply_url: str = f"https://discord.com/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
-            reply_content: str | None = content.reply_content
+            reply_content: str | None = content.reply_content_all[reply_message_group.id]
 
             # Create reply container (will get ID 10X)
             reply_container: discord.ui.Container = discord.ui.Container()
@@ -346,7 +346,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 reply_text= discord.ui.TextDisplay(
                     f"\U000021AA\U0000FE0F **Replying to @{reply_author}** - {reply_content}"
                 )
-            elif content.reply_attachments > 0:
+            elif content.reply_attachments_all[reply_message_group.id] > 0:
                 reply_text = discord.ui.TextDisplay(
                     f"\U000021AA\U0000FE0F **Replying to @{reply_author}** \U0001F5BC\U0000FE0F"
                 )
