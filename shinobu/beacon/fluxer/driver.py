@@ -419,7 +419,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
             message = await webhook_obj.send(
                 content=fluxer_content.content,
-                embeds=fluxer_content.embeds,
+                embeds=[embed.to_dict() for embed in fluxer_content.embeds],
                 files=fluxer_content.files,
                 username=custom_name,
                 avatar_url=custom_avatar,

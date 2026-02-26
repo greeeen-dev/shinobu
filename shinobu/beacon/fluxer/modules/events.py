@@ -93,11 +93,11 @@ class FluxerEvents(cog.Cog):
         return content
 
     @staticmethod
-    async def _get_attachment_data(attachment: dict) -> beacon_file.BeaconFile:
-        url: str = attachment["url"]
-        proxy_url: str = attachment.get("proxy_url")
-        filename: str = attachment["filename"]
-        media: bool = 'image/' in attachment["content_type"] or 'video/' in attachment["content_type"]
+    async def _get_attachment_data(attachment: fluxer.models.Attachment) -> beacon_file.BeaconFile:
+        url: str = attachment.url
+        proxy_url: str | None = attachment.proxy_url
+        filename: str = attachment.filename
+        media: bool = 'image/' in attachment.content_type or 'video/' in attachment.content_type
         data: bytes | None = None
 
         session = aiohttp.ClientSession()
@@ -263,29 +263,29 @@ class FluxerEvents(cog.Cog):
         )
 
     @cog.Cog.listener()
-    async def on_message_delete(self, message: fluxer.Message):
+    async def on_message_delete(self, message: dict):
         # noinspection PyUnresolvedReferences
         beacon_obj: beacon.Beacon = self.bot.beacon
 
         origin_driver: beacon_driver.BeaconDriver = beacon_obj.drivers.get_driver("discord")
 
         # Get the BeaconMessage object for the message
-        message_obj: beacon_message.BeaconMessage = beacon_obj.messages.get_message(str(message.id))
+        message_obj: beacon_message.BeaconMessage = beacon_obj.messages.get_message(str(message["id"]))
         if not message_obj:
             # We can't remove messages that aren't cached
             return
 
         # Did we bridge this message?
-        if message.webhook_id:
-            if message_obj.author.id != str(message.webhook_id):
+        if message["webhook_id"]:
+            if message_obj.author.id != str(message["webhook_id"]):
                 # We probably did
                 return
 
         # Convert guild data to server.BeaconServer
-        server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild_id))
+        server: beacon_server.BeaconServer = origin_driver.get_server(str(message["guild_id"]))
 
         # Convert channel data to channel.BeaconChannel
-        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message["channel_id"]))
 
         # Get Space
         space: beacon_space.BeaconSpace = beacon_obj.spaces.get_space_for_channel(channel)
