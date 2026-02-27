@@ -410,22 +410,28 @@ if __name__ == "__main__":
     random_plaintext_length = 100
     encryptor = AutoEncryptor()
 
-    # Set algorithm here
+    # Set encryption configs here
     algo = "xchacha20-poly1305"
+    kdf = "argon2"
+    kdf_profile = "argon2_low"
 
     algo_mapping = {
         "aes-256-gcm": "GCM",
         "xchacha20-poly1305": "XChaCha20"
     }
+    kdf_mapping = {
+        "argon2": "Argon2",
+        "pbkdf2": "PBKDF2"
+    }
 
     # Generate plaintext
     plaintext = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(random_plaintext_length)])
-    print(f"Testing {algo_mapping[algo]}Encryptor encryption with {len(plaintext)}-char plaintext with password 'password'...")
+    print(f"Testing {algo_mapping[algo]}Encryptor encryption (KDF {kdf_mapping[kdf]}, {kdf_profile}) with {len(plaintext)}-char plaintext with password 'password'...")
 
     # Test encryption
     stime = time.time()
     encrypted_data: EncryptedData = encryptor.encrypt(
-        plaintext, "password", algorithm=algo, kdf="argon2", profile="argon2_low"
+        plaintext, "password", algorithm=algo, kdf=kdf, profile=kdf_profile
     )
     etime = time.time() - stime
 
