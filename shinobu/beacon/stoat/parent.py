@@ -147,7 +147,7 @@ class StoatBot(stoat_commands.Bot):
         )
 
     async def on_ready(self, _, /):
-        print(f"Logged in to Stoat as {self.user.name} ({self.user.id})")
+        print(f"Logged in to Stoat as {self.user.name}#{self.user.discriminator} ({self.user.id})")
 
         # noinspection PyUnresolvedReferences
         self.register_driver()
