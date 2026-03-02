@@ -43,12 +43,12 @@ kdf_available: list = [
 
 # KDF profiles
 argon2_profiles: dict[str, argon2.Parameters] = {
-    "argon2_high": argon2.profiles.RFC_9106_HIGH_MEMORY,
-    "argon2_low": argon2.profiles.RFC_9106_LOW_MEMORY
+    "argon2_high": argon2.profiles.RFC_9106_HIGH_MEMORY, # RFC9106 "FIRST RECOMMENDED" parameters, recommended for cold storage
+    "argon2_low": argon2.profiles.RFC_9106_LOW_MEMORY # RFC9106 "SECOND RECOMMENDED" parameters, recommended for everything else (and when argon2_high isn't available)
 }
 pbkdf2_profiles: dict = {
-    "pbkdf2_hmac_sha_256": Hash.SHA256,
-    "pbkdf2_hmac_sha_1": Hash.SHA1,
+    "pbkdf2_hmac_sha_256": {"hash": Hash.SHA256, "iterations": 600000}, # Recommended for PBKDF2
+    "pbkdf2_hmac_sha_1": {"hash": Hash.SHA1, "iterations": 1300000}
 }
 kdf_profiles: dict[str, dict] = {
     "argon2": argon2_profiles,
@@ -60,11 +60,14 @@ argon2_available: list = [
     "argon2_low"
 ]
 
-if available_mib >= 2048:
+if available_mib >= 4096:
     # Enable high-memory profile
+    # We need 2 GiB for argon2_high, so requiring 4 GiB is a safe minimum
     argon2_available.append("argon2_high")
 
 class EncryptedData:
+    """A class representing data encrypted using any available algorithm."""
+
     def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, algorithm: str, kdf: str | None = None,
                  profile: str | None = None):
         self._ciphertext: str = ciphertext
@@ -87,38 +90,55 @@ class EncryptedData:
 
     @property
     def ciphertext(self) -> str:
+        """Ciphertext generated after encryption in base64 format."""
+
         return self._ciphertext
 
     @property
     def tag(self) -> str:
+        """Tag generated after encryption for MAC validation in base64 format."""
+
         return self._tag
 
     @property
     def nonce(self) -> str:
+        """Nonce used for cipher derivation in base64 format."""
+
         return self._nonce
 
     @property
     def salt(self) -> str:
+        """Salt used for key derivation in base64 format."""
+
         return self._salt
 
     @property
     def algorithm(self) -> str:
+        """Algorithm used for encryption."""
+
         return self._algorithm
 
     @property
     def kdf(self) -> str:
+        """KDF used for key derivation."""
+
         return self._kdf
 
     @property
     def profile(self) -> str:
+        """KDF profile used for key derivation."""
+
         return self._profile
 
     @property
     def outdated(self) -> bool:
         """Indicates whether the secrets needs re-encrypting."""
+
         return self._outdated
 
     def to_dict(self) -> dict:
+        """Returns the class data as a dict file (usually for on-disk storage)."""
+
         return {
             "ciphertext": self._ciphertext,
             "tag": self.tag,
@@ -131,6 +151,8 @@ class EncryptedData:
 
     @classmethod
     def from_dict(cls, data: dict) -> 'EncryptedData':
+        """Creates a new EncryptedData object from a dict object."""
+
         if data.get("algorithm"):
             if data["algorithm"] not in algo_available:
                 raise ValueError("Unsupported algorithm")
@@ -146,12 +168,17 @@ class EncryptedData:
         )
 
 class GCMEncryptedData(EncryptedData):
+    """A class representing data encrypted using AES-256-GCM."""
+
     def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, kdf: str | None = None,
                  profile: str | None = None):
         super().__init__(ciphertext, tag, nonce, salt, "aes-256-gcm", kdf=kdf, profile=profile)
 
     @classmethod
     def from_dict(cls, data: dict) -> 'GCMEncryptedData':
+        """Creates a new GCMEncryptedData object from a dict object.
+        For most cases, you should use EncryptedData.from_dict(data)."""
+
         if data.get("algorithm"):
             if data["algorithm"] != "aes-256-gcm":
                 raise ValueError("Not encrypted using AES-256-GCM")
@@ -167,12 +194,17 @@ class GCMEncryptedData(EncryptedData):
 
 
 class XChaCha20EncryptedData(EncryptedData):
+    """A class representing data encrypted using XChaCha20-Poly1305."""
+
     def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, kdf: str | None = None,
                  profile: str | None = None):
         super().__init__(ciphertext, tag, nonce, salt, "xchacha20-poly1305", kdf=kdf, profile=profile)
 
     @classmethod
     def from_dict(cls, data: dict) -> 'XChaCha20EncryptedData':
+        """Creates a new XChaCha20EncryptedData object from a dict object.
+        For most cases, you should use EncryptedData.from_dict(data)."""
+
         if data.get("algorithm") != "xchacha20-poly1305":
             raise ValueError("Not encrypted using XChaCha20-Poly1305")
 
@@ -188,6 +220,8 @@ class XChaCha20EncryptedData(EncryptedData):
 class BaseEncryptor:
     @staticmethod
     def decode_base64(data: EncryptedData):
+        """Decodes base64 data for decryption."""
+
         nonce: bytes = base64.b64decode(data.nonce)
         tag: bytes = base64.b64decode(data.tag)
         salt: bytes = base64.b64decode(data.salt)
@@ -196,6 +230,8 @@ class BaseEncryptor:
 
     @staticmethod
     def derive_password_hash(password: str, salt: bytes, kdf: str = "argon2", profile: str | None = None) -> bytearray:
+        """Derives password hash using the KDF and KDF profile of choice."""
+
         if kdf and kdf not in kdf_available:
             raise ValueError("Invalid KDF")
 
@@ -234,8 +270,8 @@ class BaseEncryptor:
                 password,
                 salt,
                 dkLen=32,
-                count=600000,
-                hmac_hash_module=pbkdf2_profiles[profile]
+                count=pbkdf2_profiles[profile]["iterations"],
+                hmac_hash_module=pbkdf2_profiles[profile]["hash"]
             ))
 
         return hashed_password
@@ -244,7 +280,8 @@ class GCMEncryptor(BaseEncryptor):
     @staticmethod
     def encrypt(plaintext_data: str, password: str, kdf: str = "argon2", profile: str | None = None
                 ) -> GCMEncryptedData:
-        """Encrypts a given string and returns encrypted data."""
+        """Encrypts a given string using AES-256-GCM and returns encrypted data."""
+
         if kdf and kdf not in kdf_available:
             raise ValueError("Invalid KDF")
 
@@ -286,7 +323,8 @@ class GCMEncryptor(BaseEncryptor):
 
     @staticmethod
     def decrypt(data: GCMEncryptedData | EncryptedData, password: str):
-        """Decrypts a given encrypted object."""
+        """Decrypts data encrypted using AES-256-GCM."""
+
         # Decode base64 strings to bytes
         if data.algorithm != "aes-256-gcm":
             raise ValueError("Algorithm mismatch")
@@ -314,7 +352,8 @@ class XChaCha20Encryptor(BaseEncryptor):
     @staticmethod
     def encrypt(plaintext_data: str, password: str, kdf: str = "argon2", profile: str | None = None
                 ) -> XChaCha20EncryptedData:
-        """Encrypts a given string and returns encrypted data."""
+        """Encrypts a given string using XChaCha20-Poly1305 and returns encrypted data."""
+
         if kdf and kdf not in kdf_available:
             raise ValueError("Invalid KDF")
 
@@ -356,7 +395,8 @@ class XChaCha20Encryptor(BaseEncryptor):
 
     @staticmethod
     def decrypt(data: XChaCha20EncryptedData | EncryptedData, password: str):
-        """Decrypts a given encrypted object."""
+        """Decrypts data encrypted using XChaCha20-Poly1305."""
+
         if data.algorithm != "xchacha20-poly1305":
             raise ValueError("Algorithm mismatch")
 
@@ -382,9 +422,15 @@ class XChaCha20Encryptor(BaseEncryptor):
 
 class AutoEncryptor:
     """An encryptor that encrypts and decrypts data using multiple algorithms."""
+
     @staticmethod
     def encrypt(plaintext_data: str, password: str, algorithm: str = "xchacha20-poly1305", kdf: str = "argon2",
                 profile: str | None = None) -> EncryptedData:
+        """Encrypts a given string using the algorithm of choice and returns encrypted data.
+
+        XChaCha20-Poly1305 (xchacha20-poly1305) algorithm with Argon2 KDF (argon2) using
+        argon2_low profile (argon2_high for cold storage if available) is recommended."""
+
         if algorithm not in algo_available:
             raise ValueError(f"Invalid algorithm {algorithm}")
 
@@ -396,6 +442,8 @@ class AutoEncryptor:
 
     @staticmethod
     def decrypt(data: EncryptedData, password: str) -> str:
+        """Decrypts encrypted data."""
+
         if data.algorithm not in algo_available:
             raise ValueError(f"Invalid algorithm {data.algorithm}")
 
@@ -412,7 +460,7 @@ if __name__ == "__main__":
 
     # Set encryption configs here
     algo = "xchacha20-poly1305"
-    kdf = "argon2"
+    kdf_used = "argon2"
     kdf_profile = "argon2_low"
 
     algo_mapping = {
@@ -424,14 +472,21 @@ if __name__ == "__main__":
         "pbkdf2": "PBKDF2"
     }
 
+    # Print available KDF and Profiles
+    print("Available KDFs:")
+    for kdf_entry in kdf_available:
+        print(f"- {kdf_entry} ({', '.join(kdf_profiles[kdf_entry])})")
+    print("")
+
     # Generate plaintext
     plaintext = ''.join([random.choice(string.ascii_letters + string.digits) for _ in range(random_plaintext_length)])
-    print(f"Testing {algo_mapping[algo]}Encryptor encryption (KDF {kdf_mapping[kdf]}, {kdf_profile}) with {len(plaintext)}-char plaintext with password 'password'...")
+    print(f"Testing {algo_mapping[algo]}Encryptor encryption (KDF {kdf_mapping[kdf_used]}, {kdf_profile}) with {len(plaintext)}-char plaintext with password 'password'...")
+    print("")
 
     # Test encryption
     stime = time.time()
     encrypted_data: EncryptedData = encryptor.encrypt(
-        plaintext, "password", algorithm=algo, kdf=kdf, profile=kdf_profile
+        plaintext, "password", algorithm=algo, kdf=kdf_used, profile=kdf_profile
     )
     etime = time.time() - stime
 
