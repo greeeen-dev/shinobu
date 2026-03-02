@@ -320,7 +320,6 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
         # Convert message content data
         stoat_content: StoatMessageContent = await self._to_stoat_content(content, destination)
-        print(stoat_content)
 
         # Convert bot user to BeaconUser
         self_user = self.get_user(self.bot.user.id)
