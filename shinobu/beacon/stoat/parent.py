@@ -168,9 +168,6 @@ class StoatBot(stoat_commands.Bot):
             # Do not self-bridge
             return
 
-        # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
-
         # Convert guild data to server.BeaconServer
         server: beacon_server.BeaconServer = origin_driver.get_server(message.server.id)
 
@@ -192,6 +189,9 @@ class StoatBot(stoat_commands.Bot):
         # Get the ID of the webhook to use
         membership: beacon_space.BeaconSpaceMember = space.get_member(server)
         webhook_id = membership.webhook_id
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
@@ -226,10 +226,6 @@ class StoatBot(stoat_commands.Bot):
             # We can't edit messages that aren't cached
             return
 
-        # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(partial_message)
-
-        # Did we bridge this message?
         # Did we bridge this message?
         if message.masquerade and message.author_id == self.user.id:
             # We probably did
@@ -257,6 +253,9 @@ class StoatBot(stoat_commands.Bot):
         if not space:
             # We can't bridge
             return
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(partial_message)
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(

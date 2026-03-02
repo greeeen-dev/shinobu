@@ -38,15 +38,15 @@ class FluxerEvents(cog.Cog):
 
             if embed.author:
                 embed_block.set_author(
-                    text=embed.author["name"],
-                    url=embed.author["url"],
-                    icon_url=embed.author["icon_url"]
+                    text=embed.author.get("name"),
+                    url=embed.author.get("url"),
+                    icon_url=embed.author.get("icon_url")
                 )
 
             if embed.footer:
                 embed_block.set_footer(
-                    text=embed.footer["text"],
-                    icon_url=embed.footer["icon_url"]
+                    text=embed.footer.get("text"),
+                    icon_url=embed.footer.get("icon_url")
                 )
 
             if embed.timestamp:
@@ -156,9 +156,6 @@ class FluxerEvents(cog.Cog):
                     # Do not self-bridge
                     return
 
-        # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
-
         # Convert guild data to server.BeaconServer
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild_id))
 
@@ -184,6 +181,9 @@ class FluxerEvents(cog.Cog):
         # Get the ID of the webhook to use
         membership: beacon_space.BeaconSpaceMember = space.get_member(server)
         webhook_id = membership.webhook_id
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
         # Run preliminary checks
         # noinspection PyUnresolvedReferences
@@ -215,9 +215,6 @@ class FluxerEvents(cog.Cog):
 
         origin_driver: beacon_driver.BeaconDriver = beacon_obj.drivers.get_driver("fluxer")
 
-        # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
-
         # Get the BeaconMessage object for the message
         message_obj: beacon_message.BeaconMessage = beacon_obj.messages.get_message(str(message.id))
 
@@ -246,6 +243,9 @@ class FluxerEvents(cog.Cog):
         if not space:
             # We can't bridge
             return
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await beacon_obj.can_send(

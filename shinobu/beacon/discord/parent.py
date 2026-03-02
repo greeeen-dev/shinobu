@@ -131,6 +131,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
                 reply_attachments = len(message.attachments)
 
         # Get attachments
+        # noinspection DuplicatedCode
         tasks = []
 
         for attachment in message.attachments:
@@ -215,10 +216,8 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
                     # Do not self-bridge
                     return
 
-        # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
-
         # Convert guild data to server.BeaconServer
+        # noinspection DuplicatedCode
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild.id))
 
         # Convert author data to member.BeaconMember
@@ -232,6 +231,8 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
         # Get Space
         space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
+
+        # noinspection DuplicatedCode
         if not space:
             # We can't bridge
             return
@@ -239,6 +240,9 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         # Get the ID of the webhook to use
         membership: beacon_space.BeaconSpaceMember = space.get_member(server)
         webhook_id = membership.webhook_id
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
@@ -263,6 +267,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, _, message: discord.Message):
+        # noinspection DuplicatedCode
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
         # Get the BeaconMessage object for the message
@@ -270,9 +275,6 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         if not message_obj:
             # We can't edit messages that aren't cached
             return
-
-        # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
         # Did we bridge this message?
         if message.webhook_id:
@@ -284,6 +286,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild.id))
 
         # Convert author data to member.BeaconMember
+        # noinspection DuplicatedCode
         author: beacon_member.BeaconMember = origin_driver.get_member(server, str(message.author.id))
 
         # Convert channel data to channel.BeaconChannel
@@ -302,6 +305,9 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         if not space:
             # We can't bridge
             return
+
+        # Convert message data to message.BeaconMessageContent
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
@@ -324,6 +330,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
+        # noinspection DuplicatedCode
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
         # Get the BeaconMessage object for the message
@@ -342,6 +349,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild.id))
 
         # Convert channel data to channel.BeaconChannel
+        # noinspection DuplicatedCode
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
         if not channel:
             # We can't bridge
