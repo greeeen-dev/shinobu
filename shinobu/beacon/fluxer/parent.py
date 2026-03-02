@@ -32,6 +32,10 @@ class FluxerBot(fluxer.Bot):
         self._driver: fluxer_driver.FluxerDriver = driver_obj
 
     def register_driver(self):
+        if "fluxer" in self._beacon.drivers.platforms:
+            # Do not reregister
+            return
+
         self._beacon.drivers.register_driver("fluxer", self._driver)
 
     @property

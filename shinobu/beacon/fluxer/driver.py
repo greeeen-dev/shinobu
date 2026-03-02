@@ -118,8 +118,8 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         # Enable age-gate
         self._supports_agegate = True
 
-        # Temporary fix for Fluxer flagging Discord avatar URLs as NSFW
-        self._disable_webhook_avatars = True
+        # Disable webhook avatars (in case Fluxer falsely flags them as NSFW)
+        self._disable_webhook_avatars = False
     
     def _get_guild(self, guild_id: int) -> fluxer.Guild | None:
         for guild in self.bot.guilds:
