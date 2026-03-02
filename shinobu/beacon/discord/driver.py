@@ -424,7 +424,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 current_reply_id += 1
 
             # Add text display (we will assign ID 300 to this)
-            if len(text_components) > 0:
+            if len("\n".join(text_components)) > 0:
                 components.add_item(discord.ui.TextDisplay(
                     "\n".join(text_components),
                     id=300
