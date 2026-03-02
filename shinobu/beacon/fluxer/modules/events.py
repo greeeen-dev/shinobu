@@ -24,6 +24,10 @@ class FluxerEvents(cog.Cog):
         # Create embed blocks
         embed_blocks: list[beacon_content.BeaconContentEmbed] = []
         for embed_dict in message.embeds:
+            # Only handle rich embeds
+            if embed_dict["type"] != "rich":
+                continue
+
             embed: fluxer.Embed = fluxer.Embed.from_data(embed_dict)
             embed_block: beacon_content.BeaconContentEmbed = beacon_content.BeaconContentEmbed(
                 title=embed.title,
