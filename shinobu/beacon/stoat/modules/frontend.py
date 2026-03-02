@@ -26,7 +26,6 @@ from shinobu.beacon.models import (space as beacon_space, driver as beacon_drive
 
 class BeaconFrontend(commands.Gear):
     def __init__(self, bot):
-        print("ready")
         self.bot: commands.Bot = bot
 
         # Get Beacon
