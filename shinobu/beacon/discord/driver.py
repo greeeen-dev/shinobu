@@ -424,10 +424,11 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 current_reply_id += 1
 
             # Add text display (we will assign ID 300 to this)
-            components.add_item(discord.ui.TextDisplay(
-                "\n".join(text_components),
-                id=300
-            ))
+            if len(text_components) > 0:
+                components.add_item(discord.ui.TextDisplay(
+                    "\n".join(text_components),
+                    id=300
+                ))
 
             # Add gallery (we will assign ID 500 to this)
             if len(gallery_block.items) > 0:
