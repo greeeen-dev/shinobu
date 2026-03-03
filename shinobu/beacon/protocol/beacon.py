@@ -222,7 +222,7 @@ class Beacon:
             origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message_data.get("origin_platform"))
             destination_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message_data.get("platform"))
 
-            if not origin_driver:
+            if not origin_driver or not destination_driver:
                 continue
 
             user: beacon_user.BeaconUser = origin_driver.get_user(message_data.get("author_id"))
