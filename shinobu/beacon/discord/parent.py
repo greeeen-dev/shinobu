@@ -62,6 +62,9 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         # Create embed blocks
         embed_blocks: list[beacon_content.BeaconContentEmbed] = []
         for embed in message.embeds:
+            if embed.type != "rich":
+                continue
+
             embed_block: beacon_content.BeaconContentEmbed = beacon_content.BeaconContentEmbed(
                 title=embed.title,
                 description=embed.description,
