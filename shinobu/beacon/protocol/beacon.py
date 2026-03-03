@@ -49,6 +49,7 @@ class Beacon:
         self.__wrapper: fine_grained.FineGrainedSecureFiles = files_wrapper
         self.__bot: bridge.Bot = bot
         self._config: dict = config or {}
+        self._disabled_platforms: list[str] = []
         self._init: bool = False
 
         # Get data
@@ -89,10 +90,30 @@ class Beacon:
     def messages(self) -> beacon_messages.BeaconMessageCache:
         return self._messages
 
+    @property
+    def disabled_platforms(self) -> list[str]:
+        return self._disabled_platforms
+
     @staticmethod
     def bacon():
         """Bacon because I keep confusing beacon and bacon"""
         print("Bacon 🥓")
+
+    def enable_platform(self, platform: str):
+        if platform not in self._drivers.platforms:
+            raise ValueError("Driver not registered")
+        if platform not in self._disabled_platforms:
+            raise ValueError("Platform already enabled")
+
+        self._disabled_platforms.remove(platform)
+
+    def disable_platform(self, platform: str):
+        if platform not in self._drivers.platforms:
+            raise ValueError("Driver not registered")
+        if platform in self._disabled_platforms:
+            raise ValueError("Platform already disabled")
+
+        self._disabled_platforms.append(platform)
 
     @staticmethod
     async def _strategy_sequential(callbacks: list) -> list:
@@ -456,6 +477,9 @@ class Beacon:
         # Send message for each platform
         tasks = []
         for platform in self._drivers.platforms:
+            if platform in self._disabled_platforms:
+                continue
+
             driver = self._drivers.get_driver(platform)
             tasks.append(self._send_platform(driver, author, space, content))
 
@@ -541,6 +565,9 @@ class Beacon:
         # Edit message for each platform
         tasks = []
         for platform in self._drivers.platforms:
+            if platform in self._disabled_platforms:
+                continue
+
             driver = self._drivers.get_driver(platform)
             tasks.append(self._edit_platform(driver, message_group, content))
 
@@ -562,6 +589,9 @@ class Beacon:
         # Edit message for each platform
         tasks = []
         for platform in self._drivers.platforms:
+            if platform in self._disabled_platforms:
+                continue
+
             driver = self._drivers.get_driver(platform)
             tasks.append(self._delete_platform(driver, message_group, message))
 

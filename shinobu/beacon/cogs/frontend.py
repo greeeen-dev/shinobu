@@ -44,6 +44,24 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
     async def bridge_text(self, ctx):
         pass
 
+    @bridge_text.command(name="enable-platform")
+    @commands.is_owner()
+    async def enable_platform(self, ctx: commands.Context, platform: str):
+        try:
+            self._beacon.enable_platform(platform)
+        except ValueError:
+            await ctx.send(f"platform {platform} unavailable or already enabled")
+        await ctx.send(f"enabled platform {platform}")
+
+    @bridge_text.command(name="disable-platform")
+    @commands.is_owner()
+    async def disable_platform(self, ctx: commands.Context, platform: str):
+        try:
+            self._beacon.disable_platform(platform)
+        except ValueError:
+            await ctx.send(f"platform {platform} unavailable or already disabled")
+        await ctx.send(f"disabled platform {platform}")
+
     @bridge_text.command(name="new-space")
     @commands.is_owner() # Owner only for now for debugging purposes
     async def new_space(self, ctx: commands.Context, *, name: str):
