@@ -249,8 +249,13 @@ class StoatDriver(beacon_driver.BeaconDriver):
         return content
 
     def sanitize_inbound(self, content: str) -> str:
-        """Nothing to sanitize"""
-        return content
+        return content.replace(
+            "@everyone", "@ everyone"
+        ).replace(
+            "<@", "<\\@"
+        ).replace(
+            "<@&", "<\\@\\&"
+        )
 
     # Beacon driver functions
     def get_user(self, user_id: str):
