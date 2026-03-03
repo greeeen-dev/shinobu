@@ -22,7 +22,7 @@ that's also flexible and ready for the demands of tomorrow.
 - [X] Basic Discord cross-server bridge (v0.1)
 - [X] Fluxer support (v0.2)
 - [X] Stoat (formerly Revolt) support (v0.3)
-- [ ] Bridge cache backup and restore (v0.3)
+- [X] Bridge cache backup and restore (v0.3)
 - [ ] Moderation & customization tools (v1)
 
 ### And the stuff reserved for later
