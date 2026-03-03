@@ -11,6 +11,7 @@
     "shinobu.beacon.stoat.parent",
     "shinobu.beacon.fluxer.parent"
   ],
+  "configs": ["main", "stoat", "fluxer"],
   "intents": {
     "entitlements_secrets": "Entitlement needed for platform drivers to access client tokens.",
     "entitlements_files": "Entitlement needed for beacon and cache to store bridge data."

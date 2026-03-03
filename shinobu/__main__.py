@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import os
 import sys
+import time
 import copy
 import argparse
 import ujson as json
@@ -57,6 +58,70 @@ raw_encryptor: manager.RawEncryptor | None = None
 
 # Create password variable
 password: str | None = None
+
+# Get manifests
+plugins_data: dict = {manifest_path: {}}
+if os.path.exists("plugins"):
+    for plugin in os.listdir("plugins"):
+        # Skip non-JSON files (these aren't plugin entries)
+        if not plugin.endswith(".json"):
+            continue
+
+        plugins_data.update({f"plugins/{plugin}": {}})
+
+for plugin in plugins_data:
+    with open(plugin, 'r') as manifest_file:
+        plugin_data = json.load(manifest_file)
+
+    plugins_data.update({plugin: plugin_data})
+
+def compare_manifests() -> list[str]:
+    """Compares manifests to scan for possible changes to the manifest file during reboots.
+    DOES NOT protect against changes between shutdowns (i.e. when the bootscript is not running)."""
+
+    bad_manifests: list[str] = []
+    to_compare: list[str] = [manifest_path]
+
+    if os.path.exists("plugins"):
+        for current_plugin in os.listdir("plugins"):
+            # Skip non-JSON files (these aren't plugin entries)
+            if not current_plugin.endswith(".json"):
+                continue
+
+            to_compare.append(f"plugins/{current_plugin}")
+
+    for current_plugin in to_compare:
+        with open(current_plugin, 'r') as file:
+            data = json.load(file)
+
+        # Attack 1: New manifest file
+        if current_plugin not in plugins_data.keys():
+            bad_manifests.append(current_plugin)
+            continue
+
+        # Attack 2: Modified manifest file
+        # We'll compare the new keys and current keys to be safe
+        is_modified: bool = False
+        original_data: dict = plugins_data[current_plugin]
+
+        for key in list(data.keys()):
+            if data[key] != original_data.get(key):
+                is_modified = True
+                break
+
+        for key in list(original_data.keys()):
+            if is_modified:
+                # We don't need to run this again
+                break
+
+            if data.get(key) != original_data[key]:
+                is_modified = True
+                break
+
+        if is_modified:
+            bad_manifests.append(current_plugin)
+
+    return bad_manifests
 
 class SecretsIssuingAuthority:
     """Issues FineGrainedSecrets objects."""
@@ -109,8 +174,14 @@ class SecretsIssuingAuthority:
 
     def _load_manifest(self, filepath):
         # Read plugin data
-        with open(filepath, 'r') as file:
-            data = json.load(file)
+        data: dict = plugins_data.get(filepath)
+
+        if not data:
+            # Assume invalid data
+            return
+
+        # Retrieve configs
+        configs = data.get("configs", [])
 
         # Retrieve entitlements
         entitlements_secrets = data.get("entitlements_secrets", {})
@@ -137,6 +208,11 @@ class SecretsIssuingAuthority:
         for cog in entitlements_files:
             self._cogs_registered_files.update({cog: entitlements_files[cog]})
 
+        # Create config files if they don't exist
+        for config in configs:
+            if not os.path.exists(f"configs/{config}.toml"):
+                open(f"configs/{config}.toml", "w+").close()
+
     def load_plugins(self):
         if self._cogs_registered_secrets is not None or self._cogs_registered_files is not None:
             raise ValueError("Plugins already loaded")
@@ -152,13 +228,13 @@ class SecretsIssuingAuthority:
             return
 
         # Load entitlements for each plugin
-        for plugin in os.listdir("plugins"):
+        for installed_plugin in os.listdir("plugins"):
             # Skip non-JSON files (these aren't plugin entries)
-            if not plugin.endswith(".json"):
+            if not installed_plugin.endswith(".json"):
                 continue
 
             # Grant entitlements for plugin
-            self._load_manifest(plugin)
+            self._load_manifest(f"plugins/{installed_plugin}")
 
     def check_cog_secrets_entitlements(self, cog: str) -> bool:
         """Checks if a cog has entitlements to secrets."""
@@ -430,7 +506,7 @@ class ModuleLoader:
                 )
 
     def load_extension(self, package: str, *args, **kwargs):
-        """Loads a cog and registers entitlements if available."""
+        """Loads an extension and registers entitlements if available."""
 
         # Load extension
         self.bot.load_extension(package, *args, **kwargs)
@@ -438,14 +514,7 @@ class ModuleLoader:
         # Issue entitlements
         self._issue_entitlements(package)
 
-    def reload(self, cog, *args, **kwargs):
-        """Loads a cog."""
-
-        entitlements: dict = self._get_entitlements(cog)
-
-        self.bot.reload_extension(cog, *args, **kwargs)
-
-def start_bot():
+def start_bot() -> bool:
     """Starts Shinobu!"""
 
     global tokenstore, secrets_authority, raw_encryptor, extension_map, password
@@ -477,12 +546,19 @@ def start_bot():
     bot.load_builtins()
 
     # Start bot!
+    should_restart: bool = False
+
+    # noinspection PyBroadException
     try:
         bot.run(tokenstore.retrieve("TOKEN"))
     except KeyboardInterrupt:
         pass
+    except:
+        print("Bot has crashed.")
+        should_restart = bot.should_restart
 
     bot.cleanup()
+    return should_restart
 
 def start_secrets_cli():
     """Launches the Secrets Manager CLI."""
@@ -512,7 +588,13 @@ if __name__ == "__main__":
         if launch_secrets_cli:
             start_secrets_cli()
         else:
-            start_bot()
+            while True:
+                restart_bot: bool = start_bot()
+                if not restart_bot:
+                    break
+                else:
+                    print("Restarting bot in 5 seconds...")
+                    time.sleep(5)
     except KeyboardInterrupt:
         print("Exiting...")
         sys.exit(0)

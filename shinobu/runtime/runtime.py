@@ -39,6 +39,7 @@ class ShinobuBot(bridge.Bot):
         self.__shared_objects: ShinobuSharedObjects = ShinobuSharedObjects()
         self.__cog_entitlements_loader = None
         self._cleanups = {}
+        self._should_restart: bool = False
 
         # Load configs
         self._config: dict = {}
@@ -47,6 +48,9 @@ class ShinobuBot(bridge.Bot):
                 self._config = tomllib.load(file)
         except (FileNotFoundError, tomllib.TOMLDecodeError):
             pass
+
+        # Set auto-restart on crash
+        self._should_restart = self._config.get("system", {}).get("restart_on_crash")
 
         # Get manifest
         self._manifest: str | None = None
@@ -75,6 +79,9 @@ class ShinobuBot(bridge.Bot):
             self.__cog_entitlements_loader.load_extension(module)
 
     def add_cleanup_func(self, func_name: str, func):
+        if func_name in self._cleanups:
+            raise ValueError("Cleanup function already registered")
+
         self._cleanups.update({func_name: func})
 
     def remove_cleanup_func(self, func_name: str):
@@ -98,6 +105,10 @@ class ShinobuBot(bridge.Bot):
     @property
     def config(self) -> dict:
         return self._config
+
+    @property
+    def should_restart(self) -> bool:
+        return self._should_restart
 
     @property
     def shared_objects(self):

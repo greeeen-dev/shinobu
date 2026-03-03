@@ -120,7 +120,7 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                 await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.frontend")
 
                 # Set stop function
-                self.bot.add_cleanup_func("stoat-bot-shutdown", self.stop_bot)
+                self.bot.add_cleanup_func("fluxer-bot-shutdown", self.stop_bot)
 
                 # Run bot
                 # noinspection PyBroadException
