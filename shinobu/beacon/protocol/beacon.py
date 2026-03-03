@@ -69,12 +69,6 @@ class Beacon:
         if sys.platform != "win32" and self._enable_multi:
             self._pool = aiomultiprocess.Pool()
 
-        # Add shutdown cleanup
-        # noinspection PyUnresolvedReferences
-        self.__bot.add_cleanup_func("bridge-save-data", self.save_data)
-        # noinspection PyUnresolvedReferences
-        self.__bot.add_cleanup_func("bridge-save-cache", self.messages.save)
-
     @property
     def initialized(self) -> bool:
         return self._init
@@ -267,6 +261,13 @@ class Beacon:
             self.messages.add_message(group)
 
         self._init = True
+
+        # Add shutdown cleanup
+        # noinspection PyUnresolvedReferences
+        self.__bot.add_cleanup_func("bridge-save-data", self.save_data)
+        # noinspection PyUnresolvedReferences
+        self.__bot.add_cleanup_func("bridge-save-cache", self.messages.save)
+
         print("Beacon is ready!")
 
     def save_data(self):
