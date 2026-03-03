@@ -21,11 +21,14 @@ from shinobu.beacon.models import (content as beacon_content, abc, user as beaco
                                    messageable as beacon_messageable)
 
 class BeaconMessageContent:
-    def __init__(self, original_id: str, original_channel_id: str, blocks: dict[str, beacon_content.BeaconContentBlock],
+    def __init__(self, original_id: str, original_channel_id: str, original_platform: str,
+                 blocks: dict[str, beacon_content.BeaconContentBlock],
                  files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None,
-                 reply_content: str | dict[str, int] | None = None, reply_attachments: int | dict[str, int] | None = None):
+                 reply_content: str | dict[str, int] | None = None,
+                 reply_attachments: int | dict[str, int] | None = None):
         self._original_id: str = original_id
         self._original_channel_id: str = original_channel_id
+        self._original_platform: str = original_platform
         self._blocks: dict[str, beacon_content.BeaconContentBlock] = blocks
         self._files: list[beacon_file.BeaconFile] = files or []
         self._replies: list[BeaconMessageGroup] = replies or []
@@ -49,6 +52,10 @@ class BeaconMessageContent:
     @property
     def original_channel_id(self) -> str:
         return self._original_channel_id
+
+    @property
+    def original_platform(self) -> str:
+        return self._original_platform
 
     @property
     def blocks(self) -> dict[str, beacon_content.BeaconContentBlock]:
@@ -175,20 +182,19 @@ class BeaconMessageGroup:
             "id": self.id,
             "author": self.author_id,
             "space": self._space_id,
-            "messages": {}
+            "messages": list(self._messages.keys()),
+            "replies": self.replies.copy()
         }
-
-        for message in self._messages:
-            data["messages"].update({message: self._messages[message].to_dict()})
 
         return data
 
 class BeaconMessage(abc.BeaconABC):
-    def __init__(self, message_id: str, platform: str, author: beacon_user.BeaconUser,
+    def __init__(self, message_id: str, platform: str, origin_platform: str, author: beacon_user.BeaconUser,
                  server: beacon_server.BeaconServer | None = None, channel: beacon_channel.BeaconChannel | None = None,
                  content: str | dict | None = None, attachments: int = 0, replies: list['BeaconMessage'] | None = None,
                  webhook_id: str | None = None):
         super().__init__(message_id, platform)
+        self._origin_platform: str = origin_platform
         self._author: beacon_user.BeaconUser = author
         self._server: beacon_server.BeaconServer | None = server
         self._channel: beacon_channel.BeaconChannel | None = channel
@@ -196,6 +202,10 @@ class BeaconMessage(abc.BeaconABC):
         self._attachments: int = attachments
         self._replies: list[BeaconMessage] = replies or []
         self._webhook_id: str | None = webhook_id
+
+    @property
+    def origin_platform(self) -> str:
+        return self._origin_platform
 
     @property
     def author(self) -> beacon_user.BeaconUser | beacon_webhook.BeaconWebhook:
@@ -231,6 +241,7 @@ class BeaconMessage(abc.BeaconABC):
         converted: dict = {
             "id": self.id,
             "platform": self.platform,
+            "origin_platform": self.origin_platform,
             "author_id": self.author.id,
             "server_id": self.server.id if self.server else None,
             "channel_id": self.channel.id if self.channel else None,

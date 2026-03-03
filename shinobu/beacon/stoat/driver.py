@@ -152,6 +152,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
         return beacon_message.BeaconMessage(
             message_id=str(message.id),
             platform=self.platform,
+            origin_platform=self.platform,
             author=author,
             server=server,
             channel=channel,
@@ -337,6 +338,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
             return beacon_message.BeaconMessage(
                 message_id=content.original_id,
                 platform=self.platform,
+                origin_platform=content.original_platform,
                 author=send_as or self_user,
                 server=self.get_server(target.server.id),
                 channel=channel,
@@ -366,6 +368,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
         return beacon_message.BeaconMessage(
             message_id=message.id,
             platform=self.platform,
+            origin_platform=content.original_platform,
             author=send_as or self_user,
             server=self.get_server(target.server.id),
             channel=channel,

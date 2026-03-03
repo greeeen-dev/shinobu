@@ -85,12 +85,22 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
     def beacon(self) -> beacon.Beacon:
         return self._beacon
 
+    def stop_bot(self):
+        """Closes Fluxer bot loop."""
+
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(self.fluxer_bot.close())
+        loop.close()
+
     async def run_fluxer(self, token: str):
         if not self.can_boot:
             print("Fluxer not whitelisted in Beacon config. Shutting down Fluxer bot parent.")
             return
 
         while True:
+            # Ensure fluxer-bot-shutdown task doesn't exist
+            self.bot.remove_cleanup_func("fluxer-bot-shutdown")
+
             # noinspection PyBroadException
             try:
                 # noinspection PyProtectedMember
@@ -108,6 +118,9 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                 # Load events cog
                 await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.events")
                 await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.frontend")
+
+                # Set stop function
+                self.bot.add_cleanup_func("stoat-bot-shutdown", self.stop_bot)
 
                 # Run bot
                 # noinspection PyBroadException

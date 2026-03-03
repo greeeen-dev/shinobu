@@ -87,6 +87,7 @@ class FluxerEvents(cog.Cog):
         content: beacon_message.BeaconMessageContent = beacon_message.BeaconMessageContent(
             original_id=str(message.id),
             original_channel_id=str(message.channel.id),
+            original_platform="fluxer",
             blocks=blocks,
             files=files,
             replies=[],
@@ -122,6 +123,10 @@ class FluxerEvents(cog.Cog):
     @cog.Cog.listener()
     async def on_ready(self):
         print(f"Logged in to Fluxer as {self.bot.user.username}#{self.bot.user.discriminator} ({self.bot.user.id})")
+
+        # We'll wait 0.5s before registering driver so GUILD_CREATE events have time to be received and handled
+        await asyncio.sleep(0.5)
+
         # noinspection PyUnresolvedReferences
         self.bot.register_driver()
 

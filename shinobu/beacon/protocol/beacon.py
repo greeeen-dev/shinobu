@@ -26,7 +26,7 @@ from shinobu.beacon.protocol import (drivers as beacon_drivers, spaces as beacon
                                      filters as beacon_filters)
 from shinobu.beacon.models import (space as beacon_space, message as beacon_message, content as beacon_content,
                                    filter as beacon_filter, member as beacon_member, channel as beacon_channel,
-                                   driver as beacon_driver, server as beacon_server)
+                                   driver as beacon_driver, server as beacon_server, user as beacon_user)
 from shinobu.runtime.secrets import fine_grained
 
 # Set start method to fork
@@ -68,6 +68,12 @@ class Beacon:
 
         if sys.platform != "win32" and self._enable_multi:
             self._pool = aiomultiprocess.Pool()
+
+        # Add shutdown cleanup
+        # noinspection PyUnresolvedReferences
+        self.__bot.add_cleanup_func("bridge-save-data", self.save_data)
+        # noinspection PyUnresolvedReferences
+        self.__bot.add_cleanup_func("bridge-save-cache", self.messages.save)
 
     @property
     def initialized(self) -> bool:
@@ -142,8 +148,10 @@ class Beacon:
         # Get data from wrapper
         data: dict = self.__wrapper.read_json("beacon")
 
+        # Get cache from wrapper
+        cache: dict = self.__wrapper.read_json("cache")
+
         # Load spaces
-        # {'spaces': {'674f2cfe-7f02-422e-a4da-06951bb13152': {'id': '674f2cfe-7f02-422e-a4da-06951bb13152', 'name': 'test', 'emoji': None, 'members': [], 'invites': [], 'bans': [], 'options': {'private': False, 'nsfw': False, 'relay_deletes': True, 'relay_edits': True, 'convert_large_files': True}}}}
         for space_id, space_data in data.get("spaces", {}).items():
             space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
                 space_id=space_id,
@@ -208,6 +216,55 @@ class Beacon:
 
             # Add space
             self.spaces.add_space(space)
+
+        # Load message cache
+        for message_id, message_data in cache.get("messages", {}).items():
+            origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message_data.get("origin_platform"))
+            destination_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message_data.get("platform"))
+
+            if not origin_driver:
+                continue
+
+            user: beacon_user.BeaconUser = origin_driver.get_user(message_data.get("author_id"))
+            server: beacon_server.BeaconServer = destination_driver.get_server(message_data.get("server_id"))
+            channel: beacon_channel.BeaconChannel | None = destination_driver.get_channel(server, message_data.get("channel_id")) if server else None
+
+            if not user or not server or not channel:
+                continue
+
+            message: beacon_message.BeaconMessage = beacon_message.BeaconMessage(
+                message_id=message_id,
+                platform=message_data.get("platform"),
+                origin_platform=message_data.get("origin_platform"),
+                author=user,
+                server=server,
+                channel=channel,
+                webhook_id=message_data.get("webhook_id")
+            )
+
+            self.messages.add_message(message)
+
+        # Load message groups
+        for group_id, group_data in cache.get("groups", {}).items():
+            group_messages: list[beacon_message.BeaconMessage] = []
+
+            for message_id in group_data.get("messages", []):
+                message: beacon_message.BeaconMessage | None = self.messages.get_message(message_id)
+
+                if not message:
+                    continue
+
+                group_messages.append(message)
+
+            group: beacon_message.BeaconMessageGroup = beacon_message.BeaconMessageGroup(
+                group_id=group_id,
+                author=group_data.get("author_id"),
+                space_id=group_data.get("author_id"),
+                messages=group_messages,
+                replies=group_data.get("replies", [])
+            )
+
+            self.messages.add_message(group)
 
         self._init = True
         print("Beacon is ready!")
@@ -430,6 +487,7 @@ class Beacon:
         )
 
         # Cache message group
+        # noinspection PyTypeChecker
         await self.__bot.loop.run_in_executor(
             None, lambda: self._messages.add_message(message_group, save=True)
         )
@@ -510,4 +568,5 @@ class Beacon:
         await self._strategy_async(tasks, return_exceptions=False)
 
         # Remove message group from cache
+        # noinspection PyTypeChecker
         await self.__bot.loop.run_in_executor(None, lambda: self.messages.remove_message_group(message_group))

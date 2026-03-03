@@ -154,6 +154,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         content: beacon_message.BeaconMessageContent = beacon_message.BeaconMessageContent(
             original_id=str(message.id),
             original_channel_id=str(message.channel.id),
+            original_platform="discord",
             blocks=blocks,
             files=files,
             replies=replies,

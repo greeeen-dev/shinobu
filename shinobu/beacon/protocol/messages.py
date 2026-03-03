@@ -89,14 +89,26 @@ class BeaconMessageCache:
     def save(self):
         """Saves cache as an encrypted file."""
 
+        # As this is the message cache, we can lose this data and still be fine.
+        # So if any errors arise, it may be acceptable to ignore them and lose the cached message
+        # or message group causing the errors.
+
         # Convert data to dictionary
         converted = {}
         for message in self._data:
-            converted.update({message: self._data[message].to_dict()})
+            try:
+                converted.update({message: self._data[message].to_dict()})
+            except AttributeError:
+                # Assume something is just set to None
+                continue
 
         converted_groups = {}
         for group in self._data_groups:
-            converted_groups.update({group: self._data_groups[group].to_dict()})
+            try:
+                converted_groups.update({group: self._data_groups[group].to_dict()})
+            except AttributeError:
+                # Assume something is just set to None
+                continue
 
         # Save data as JSON
         self.__wrapper.save_json("cache", {

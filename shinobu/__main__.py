@@ -477,7 +477,12 @@ def start_bot():
     bot.load_builtins()
 
     # Start bot!
-    bot.run(tokenstore.retrieve("TOKEN"))
+    try:
+        bot.run(tokenstore.retrieve("TOKEN"))
+    except KeyboardInterrupt:
+        pass
+
+    bot.cleanup()
 
 def start_secrets_cli():
     """Launches the Secrets Manager CLI."""

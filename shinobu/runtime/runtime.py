@@ -38,6 +38,7 @@ class ShinobuBot(bridge.Bot):
         super().__init__(*args, **kwargs)
         self.__shared_objects: ShinobuSharedObjects = ShinobuSharedObjects()
         self.__cog_entitlements_loader = None
+        self._cleanups = {}
 
         # Load configs
         self._config: dict = {}
@@ -72,6 +73,28 @@ class ShinobuBot(bridge.Bot):
 
         for module in data["modules"]:
             self.__cog_entitlements_loader.load_extension(module)
+
+    def add_cleanup_func(self, func_name: str, func):
+        self._cleanups.update({func_name: func})
+
+    def remove_cleanup_func(self, func_name: str):
+        self._cleanups.pop(func_name, None)
+
+    def cleanup(self):
+        current_index: int = 1
+        total: int = len(self._cleanups)
+        for name, cleanup_func in self._cleanups.items():
+            print(f"Cleaning up runtime. ({name}, {current_index}/{total})")
+
+            # noinspection PyBroadException
+            try:
+                cleanup_func()
+            except:
+                raise
+                # For the sake of letting other cleanup functions run, we'll ignore the error
+                pass
+
+            current_index += 1
 
     @property
     def config(self) -> dict:

@@ -120,6 +120,7 @@ class StoatBot(stoat_commands.Bot):
         content: beacon_message.BeaconMessageContent = beacon_message.BeaconMessageContent(
             original_id=str(message.id),
             original_channel_id=str(message.channel.id),
+            original_platform="stoat",
             blocks=blocks,
             files=files,
             replies=replies,
@@ -350,12 +351,22 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
             # Create driver
             self._driver = stoat_driver.StoatDriver(self.stoat_bot, self._beacon.messages)
 
+    def stop_bot(self):
+        """Closes Stoat bot loop."""
+
+        loop = asyncio.new_event_loop()
+        loop.run_until_complete(self.stoat_bot.close())
+        loop.close()
+
     async def run_stoat(self, token: str):
         if not self.can_boot:
             print("Stoat not whitelisted in Beacon config. Shutting down Stoat bot parent.")
             return
 
         while True:
+            # Ensure stoat-bot-shutdown task doesn't exist
+            self.bot.remove_cleanup_func("stoat-bot-shutdown")
+
             # noinspection PyBroadException
             try:
                 bot_needs_open: bool = (self.stoat_bot is None) or (self.stoat_bot.closed if self.stoat_bot else False)
@@ -369,7 +380,11 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
                     )
                     self._driver.replace_bot(self.stoat_bot)
 
+                # Load extensions
                 await self.stoat_bot.add_extensions()
+
+                # Set stop function
+                self.bot.add_cleanup_func("stoat-bot-shutdown", self.stop_bot)
 
                 # Run bot
                 # noinspection PyBroadException
