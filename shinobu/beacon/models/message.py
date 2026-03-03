@@ -248,7 +248,13 @@ class BeaconMessage(abc.BeaconABC):
             "webhook_id": self.webhook_id
         }
 
-        converted.update({"replies": [reply.id for reply in self._replies]})
+        converted_replies: list[str] = []
+
+        for reply in self._replies:
+            if reply:
+                converted_replies.append(reply.id)
+
+        converted.update({"replies": converted_replies})
 
         # NOTE: include_content is NOT recommended to be used if not necessary for the sake
         # of minimizing data stored on-disk (even if encrypted).
