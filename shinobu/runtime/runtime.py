@@ -43,7 +43,7 @@ class ShinobuBot(bridge.Bot):
         # Load configs
         self._config: dict = {}
         try:
-            with open("config.toml", "rb") as file:
+            with open("configs/main.toml", "rb") as file:
                 self._config = tomllib.load(file)
         except (FileNotFoundError, tomllib.TOMLDecodeError):
             pass
@@ -90,7 +90,6 @@ class ShinobuBot(bridge.Bot):
             try:
                 cleanup_func()
             except:
-                raise
                 # For the sake of letting other cleanup functions run, we'll ignore the error
                 pass
 
