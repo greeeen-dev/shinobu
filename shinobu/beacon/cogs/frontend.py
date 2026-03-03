@@ -50,7 +50,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         try:
             self._beacon.enable_platform(platform)
         except ValueError:
-            await ctx.send(f"platform {platform} unavailable or already enabled")
+            return await ctx.send(f"platform {platform} unavailable or already enabled")
         await ctx.send(f"enabled platform {platform}")
 
     @bridge_text.command(name="disable-platform")
@@ -59,7 +59,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         try:
             self._beacon.disable_platform(platform)
         except ValueError:
-            await ctx.send(f"platform {platform} unavailable or already disabled")
+            return await ctx.send(f"platform {platform} unavailable or already disabled")
         await ctx.send(f"disabled platform {platform}")
 
     @bridge_text.command(name="new-space")
