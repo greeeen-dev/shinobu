@@ -259,12 +259,15 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             return
 
         # Send message!
-        await self._beacon.send(
-            author=author,
-            space=space,
-            content=content,
-            webhook_id=webhook_id
-        )
+        try:
+            await self._beacon.send(
+                author=author,
+                space=space,
+                content=content,
+                webhook_id=webhook_id
+            )
+        except beacon.BeaconPlatformDisabled:
+            pass
 
     @commands.Cog.listener()
     async def on_message_edit(self, _, message: discord.Message):
@@ -324,10 +327,13 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             return
 
         # Edit the message!
-        await self._beacon.edit(
-            message=message_obj,
-            content=content
-        )
+        try:
+            await self._beacon.edit(
+                message=message_obj,
+                content=content
+            )
+        except beacon.BeaconPlatformDisabled:
+            pass
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
@@ -364,7 +370,10 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             return
 
         # Delete the message!
-        await self._beacon.delete(message=message_obj)
+        try:
+            await self._beacon.delete(message=message_obj)
+        except beacon.BeaconPlatformDisabled:
+            pass
 
 def get_cog_type():
     return DiscordDriverParent

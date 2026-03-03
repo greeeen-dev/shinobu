@@ -208,12 +208,15 @@ class StoatBot(stoat_commands.Bot):
             return
 
         # Send message!
-        await self._beacon.send(
-            author=author,
-            space=space,
-            content=content,
-            webhook_id=webhook_id
-        )
+        try:
+            await self._beacon.send(
+                author=author,
+                space=space,
+                content=content,
+                webhook_id=webhook_id
+            )
+        except beacon.BeaconPlatformDisabled:
+            pass
 
     async def on_message_update(self, event: stoat.MessageUpdateEvent):
         partial_message: stoat.PartialMessage = event.message
@@ -272,10 +275,13 @@ class StoatBot(stoat_commands.Bot):
             return
 
         # Edit the message!
-        await self._beacon.edit(
-            message=message_obj,
-            content=content
-        )
+        try:
+            await self._beacon.edit(
+                message=message_obj,
+                content=content
+            )
+        except beacon.BeaconPlatformDisabled:
+            pass
 
     async def on_message_delete(self, event: stoat.MessageDeleteEvent):
         message: stoat.Message = event.message
@@ -310,7 +316,10 @@ class StoatBot(stoat_commands.Bot):
             return
 
         # Delete the message!
-        await self._beacon.delete(message=message_obj)
+        try:
+            await self._beacon.delete(message=message_obj)
+        except beacon.BeaconPlatformDisabled:
+            pass
 
 class StoatDriverParent(shinobu_cog.ShinobuCog):
     def __init__(self, bot):

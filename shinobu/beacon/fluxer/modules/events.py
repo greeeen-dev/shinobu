@@ -205,13 +205,16 @@ class FluxerEvents(cog.Cog):
             return
 
         # Send message!
-        # noinspection PyUnresolvedReferences
-        await self.bot.beacon.send(
-            author=author,
-            space=space,
-            content=content,
-            webhook_id=webhook_id
-        )
+        try:
+            # noinspection PyUnresolvedReferences
+            await self.bot.beacon.send(
+                author=author,
+                space=space,
+                content=content,
+                webhook_id=webhook_id
+            )
+        except beacon.BeaconPlatformDisabled:
+            pass
 
     @cog.Cog.listener()
     async def on_message_edit(self, message: fluxer.Message):
@@ -266,10 +269,13 @@ class FluxerEvents(cog.Cog):
             return
 
         # Edit the message!
-        await beacon_obj.edit(
-            message=message_obj,
-            content=content
-        )
+        try:
+            await beacon_obj.edit(
+                message=message_obj,
+                content=content
+            )
+        except beacon.BeaconPlatformDisabled:
+            pass
 
     @cog.Cog.listener()
     async def on_message_delete(self, message: dict):
@@ -304,7 +310,10 @@ class FluxerEvents(cog.Cog):
             return
 
         # Delete the message!
-        await beacon_obj.delete(message=message_obj)
+        try:
+            await beacon_obj.delete(message=message_obj)
+        except beacon.BeaconPlatformDisabled:
+            pass
 
 async def setup(bot):
     await bot.add_cog(FluxerEvents(bot))

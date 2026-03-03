@@ -42,6 +42,10 @@ class BeaconNotInit(Exception):
     def __init__(self):
         super().__init__("The resource is not available because Beacon isn't ready yet.")
 
+class BeaconPlatformDisabled(Exception):
+    def __init__(self, platform: str):
+        super().__init__(f"The resource is not available because {platform} is disabled.")
+
 class Beacon:
     def __init__(self, bot: bridge.Bot, files_wrapper: fine_grained.FineGrainedSecureFiles, config: dict | None = None,
                  enable_multi: bool = True):
@@ -452,6 +456,9 @@ class Beacon:
         if not self.initialized:
             raise BeaconNotInit()
 
+        if content.original_platform in self._disabled_platforms:
+            raise BeaconPlatformDisabled(content.original_platform)
+
         # Ensure we can send the message
         blocking_condition: BeaconMessageBlockedReason | None = await self.can_send(author, space, content, webhook_id)
 
@@ -526,6 +533,9 @@ class Beacon:
         if not self.initialized:
             raise BeaconNotInit()
 
+        if content.original_platform in self._disabled_platforms:
+            raise BeaconPlatformDisabled(content.original_platform)
+
         origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message.platform)
 
         # Get message metadata
@@ -579,6 +589,9 @@ class Beacon:
 
         if not self.initialized:
             raise BeaconNotInit()
+
+        if message.platform in self._disabled_platforms:
+            raise BeaconPlatformDisabled(message.platform)
 
         # Get message group
         message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
