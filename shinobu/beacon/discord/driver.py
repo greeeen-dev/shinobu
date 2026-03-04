@@ -321,7 +321,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
             reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
             reply_url: str = f"https://discord.com/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
-            reply_content: str | None = content.reply_content_all[reply_message_group.id]
+            reply_content: str | None = content.reply_content_all[reply_message_group.id] if content.reply_content_all else None
 
             # Create reply container (will get ID 10X)
             reply_container: discord.ui.Container = discord.ui.Container()
