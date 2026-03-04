@@ -1,3 +1,4 @@
+/backup/*
 /data/*
 .env
 .secrets.json
