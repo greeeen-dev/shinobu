@@ -1,5 +1,12 @@
-# Shinobu 🐈
-Converse from anywhere, anytime. Shinobu is a versatile cross-platform bridge bot.
+<h1 align="center">
+  <img width="120" height="120" src="./images/icon.webp">
+  <br>
+  Shinobu
+</h1>
+
+<p align="center">
+  Converse from anywhere, anytime.
+</p>
 
 ## Why build Shinobu?
 I was the lead developer behind Unifier, another open-source bridge bot. I discontinued it a while
