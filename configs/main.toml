@@ -1,7 +1,12 @@
 [system]
-owner_id = "" # Input your Discord user ID here. If empty this will use bot.owner_id
+owner_id = 356456393491873795
+admin_ids = []
 restart_on_crash = true
 
 [beacon]
 enable_platform_whitelist = true
-enabled_platforms = ["discord", "stoat", "fluxer"]
+enabled_platforms = [
+    "discord",
+    "stoat",
+    "fluxer",
+]

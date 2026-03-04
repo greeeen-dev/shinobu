@@ -30,7 +30,7 @@ from dotenv import load_dotenv
 from shinobu.runtime import runtime
 from shinobu.runtime.secrets import manager, fine_grained, encryptor
 from shinobu.runtime.models import shinobu_cog
-from shinobu.cli import secrets as secrets_cli
+from shinobu.cli import secrets as secrets_cli, installer as installer_cli
 
 # Manifest path
 manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
@@ -45,10 +45,12 @@ parser = argparse.ArgumentParser(
     description="Converse from anywhere, anytime. Shinobu is a versatile cross-platform bridge bot."
 )
 parser.add_argument("--secrets", help="Launches the Secrets Manager CLI.", action="store_true")
+parser.add_argument("--installer", help="Launches the installer CLI.", action="store_true")
 launch_args = parser.parse_args()
 
 # Get launch options
 launch_secrets_cli: bool = launch_args.secrets
+launch_installer_cli: bool = launch_args.installer
 
 # Create TokenStore variable (do not initialize yet)
 tokenstore: manager.TokenStore | None = None
@@ -572,6 +574,11 @@ def start_secrets_cli():
     cli: secrets_cli.ShinobuSecretsCLI = secrets_cli.ShinobuSecretsCLI(cli_tokenstore, cli_encryptor)
     cli.run()
 
+def start_installer_cli():
+    """Launches the installer CLI."""
+    cli: installer_cli.ShinobuInstallerCLI = installer_cli.ShinobuInstallerCLI()
+    cli.run()
+
 # Start Shinobu Runtime
 if __name__ == "__main__":
     try:
@@ -581,12 +588,17 @@ if __name__ == "__main__":
         if os.environ.get("SHINOBU_ENCRYPTION_PASSWORD"):
             print("WARNING: Inheriting password from .env file. Do not store your password here for production environments.")
             password = os.environ.get("SHINOBU_ENCRYPTION_PASSWORD")
+        elif launch_installer_cli:
+            # We're reinstalling (or installing), so we don't need the password
+            pass
         else:
             # Prompt for password (safer!)
             password = getpass.getpass("Encryption password: ")
 
         if launch_secrets_cli:
             start_secrets_cli()
+        elif launch_installer_cli:
+            start_installer_cli()
         else:
             while True:
                 restart_bot: bool = start_bot()

@@ -20,7 +20,6 @@ import ujson as json
 import traceback
 import string
 import copy
-import base64
 from Crypto.Random import random
 from shinobu.runtime.secrets import encryptor
 
