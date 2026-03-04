@@ -1,5 +1,6 @@
 /backup/*
 /data/*
+/scripts/*
 .env
 .secrets.json
 .install.json
