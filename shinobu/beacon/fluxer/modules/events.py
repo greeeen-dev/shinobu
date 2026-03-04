@@ -63,6 +63,24 @@ class FluxerEvents(cog.Cog):
             # Add to embed blocks
             embed_blocks.append(embed_block)
 
+        # Add reply if it exists
+        replies: list[beacon_message.BeaconMessageGroup] = []
+        reply_content: str | None = None
+        reply_attachments: int = 0
+
+        if message.referenced_message:
+            # noinspection PyUnresolvedReferences
+            reply_group: beacon_message.BeaconMessageGroup | None = self.bot.beacon.messages.get_group_from_message(
+                str(message.referenced_message.id)
+            )
+            if reply_group:
+                replies.append(reply_group)
+
+        if message.referenced_message and len(replies) > 0:
+            reply_message: fluxer.Message = message.referenced_message
+            reply_content = reply_message.content
+            reply_attachments = len(message.attachments)
+
         # Get attachments
         # noinspection DuplicatedCode
         tasks = []
@@ -90,9 +108,9 @@ class FluxerEvents(cog.Cog):
             original_platform="fluxer",
             blocks=blocks,
             files=files,
-            replies=[],
-            reply_content=None,
-            reply_attachments=0
+            replies=replies,
+            reply_content=origin_driver.sanitize_outbound(reply_content) if reply_content else None,
+            reply_attachments=reply_attachments
         )
 
         return content

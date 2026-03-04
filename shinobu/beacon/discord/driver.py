@@ -314,6 +314,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         has_reply: bool = False
         for reply_message_group in content.replies:
             # Find channel-specific reply
+            # noinspection DuplicatedCode
             reply_message: beacon_message.BeaconMessage | None = reply_message_group.get_message_for(destination)
 
             if not reply_message:

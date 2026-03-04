@@ -203,13 +203,47 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         )
 
     async def _to_fluxer_content(self, content: beacon_message.BeaconMessageContent,
-                                 _: beacon_messageable.BeaconMessageable) -> FluxerMessageContent:
+                                 destination: beacon_messageable.BeaconMessageable) -> FluxerMessageContent:
         # Content
         embeds: list[fluxer.Embed] = []
         replies: list[fluxer.Message] = []
         # noinspection DuplicatedCode
         text_components: list[str] = []
         files: list[fluxer.File] = FluxerBeaconFilesConverter.files(content.files)
+
+        # Process reply
+        # To not eat up too many embeds, we'll just convert the first valid reply only
+        for reply_message_group in content.replies:
+            # Find channel-specific reply
+            # noinspection DuplicatedCode
+            reply_message: beacon_message.BeaconMessage | None = reply_message_group.get_message_for(destination)
+
+            if not reply_message:
+                continue
+
+            reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
+            reply_url: str = f"https://discord.com/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
+            reply_content: str | None = content.reply_content_all[
+                reply_message_group.id] if content.reply_content_all else None
+
+            # Create reply embed
+            reply_embed: fluxer.Embed = fluxer.Embed()
+            reply_embed.set_author(
+                name=f"\U000021AA\U0000FE0F Replying to @{reply_author}",
+                url=reply_url,
+                icon_url=reply_message.author.avatar_url if reply_message.author else None
+            )
+
+            # Create content text display (if possible)
+            if reply_content:
+                # We'll cap content to 200 characters
+                if len(reply_content) > 200:
+                    reply_content = reply_content[:197] + "..."
+
+                reply_embed.description = reply_content
+
+            # Append embed
+            embeds.append(reply_embed)
 
         # Convert blocks
         for block_id in content.blocks:
@@ -219,8 +253,6 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 text_components.append(FluxerBeaconContentBlockConverter.text(block_obj))
             elif isinstance(block_obj, beacon_content.BeaconContentEmbed):
                 embeds.append(FluxerBeaconContentBlockConverter.embed(block_obj))
-
-        # Replies will be implemented once fluxer.py has replies built in
 
         # Assemble to FluxerMessageContent
         return FluxerMessageContent(
