@@ -222,7 +222,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 continue
 
             reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
-            reply_url: str = f"https://fluxer.app/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
+            reply_url: str = f"https://web.fluxer.app/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
             reply_content: str | None = content.reply_content_all[
                 reply_message_group.id] if content.reply_content_all else None
 
