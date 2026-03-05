@@ -40,7 +40,7 @@ class BeaconMessageContent:
         else:
             self._reply_content = reply_content
 
-        if type(reply_attachments) is int and reply_attachments:
+        if type(reply_attachments) is int and len(self._replies) > 0:
             self._reply_attachments = {self._replies[0].id: reply_attachments}
         else:
             self._reply_attachments = reply_attachments
