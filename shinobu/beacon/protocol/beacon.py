@@ -55,6 +55,7 @@ class Beacon:
         self._config: dict = config or {}
         self._disabled_platforms: list[str] = []
         self._init: bool = False
+        self._bridge_tasks: dict[str, list] = {}
 
         # Get data
         self._data: dict = self.__wrapper.read_json("beacon").get("raw", {})
@@ -98,6 +99,10 @@ class Beacon:
     def disabled_platforms(self) -> list[str]:
         return self._disabled_platforms
 
+    @property
+    def pending_bridge_tasks(self) -> int:
+        return len(self._bridge_tasks)
+
     @staticmethod
     def bacon():
         """Bacon because I keep confusing beacon and bacon"""
@@ -130,11 +135,15 @@ class Beacon:
 
         return results
 
-    @staticmethod
-    async def _strategy_async(callbacks: list, return_exceptions: bool = False) -> list:
+    async def _strategy_async(self, callbacks: list, return_exceptions: bool = False) -> list:
         """Concurrently executes asynchronous callbacks."""
 
-        return await asyncio.gather(*callbacks, return_exceptions=return_exceptions)
+        tasks = [asyncio.create_task(callback) for callback in callbacks]
+
+        # Add task to tasks list
+        self._bridge_tasks.update({str(uuid.uuid4()): [tasks]})
+
+        return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
     async def _strategy_multi(self, callbacks: list, return_exceptions: bool = False) -> list:
         """Uses aiomultiprocess to execute asynchronous callbacks in parallel.
@@ -152,6 +161,16 @@ class Beacon:
 
         # Run tasks in pool (and return result)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
+
+    def cancel_pending_tasks(self):
+        for task_entry in self._bridge_tasks:
+            for task in self._bridge_tasks[task_entry]:
+                if not isinstance(task, asyncio.Task):
+                    continue
+
+                task.cancel()
+
+        self._bridge_tasks.clear()
 
     def load_data(self):
         if self.drivers.has_reserved:

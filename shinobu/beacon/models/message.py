@@ -25,7 +25,7 @@ class BeaconMessageContent:
                  blocks: dict[str, beacon_content.BeaconContentBlock],
                  files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None,
                  reply_content: str | dict[str, int] | None = None,
-                 reply_attachments: int | dict[str, int] | None = None):
+                 reply_attachments: int | dict[str, int] | None = None, suppress_embeds: bool = False):
         self._original_id: str = original_id
         self._original_channel_id: str = original_channel_id
         self._original_platform: str = original_platform
@@ -44,6 +44,12 @@ class BeaconMessageContent:
             self._reply_attachments = {self._replies[0].id: reply_attachments}
         else:
             self._reply_attachments = reply_attachments
+
+        if suppress_embeds:
+            # Remove any embeds block
+            for block_id, block in self._blocks.items():
+                if isinstance(block, beacon_content.BeaconContentEmbed):
+                    self._blocks.pop(block_id)
 
     @property
     def original_id(self) -> str:

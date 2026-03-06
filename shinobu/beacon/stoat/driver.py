@@ -249,13 +249,26 @@ class StoatDriver(beacon_driver.BeaconDriver):
         return content
 
     def sanitize_inbound(self, content: str) -> str:
-        return content.replace(
+        # Remove @everyone pinging and escape mentions
+        content = content.replace(
             "@everyone", "@ everyone"
         ).replace(
             "<@", "<\\@"
         ).replace(
             "<@&", "<\\@\\&"
         )
+
+        # Fix markdown
+        content_components: list[str] = content.split("\n")
+        for index in range(len(content_components)):
+            component: str = content_components[index]
+
+            if component.startswith("-# "):
+                content_components[index] = component.replace("-# ", "##### ", 1)
+        content = "\n".join(content_components)
+
+        # Return content
+        return content
 
     # Beacon driver functions
     def get_user(self, user_id: str):

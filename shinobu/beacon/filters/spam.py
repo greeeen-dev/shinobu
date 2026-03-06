@@ -1,11 +1,9 @@
-import re
 import unicodedata
 import jellyfish
 import time
-from tld import get_tld
 from shinobu.beacon.models import (filter as beacon_filter, user as beacon_user, member as beacon_member,
                                    message as beacon_message)
-from shinobu.beacon.utils import rapidphish
+from shinobu.beacon.utils import rapidphish, url_getter
 
 # Common spam/phishing content
 # If a message contains ALL of the keywords in any of the entries, the Filter will flag it.
@@ -55,99 +53,6 @@ def uppercase_ratio(text):
     if not letters:
         return 0, 0
     return (len(capitals) / len(letters)), len(letters)
-
-def bypass_killer(string):
-    if not [*string][len(string) - 1].isalnum():
-        return string[:-1]
-    else:
-        return None
-
-def get_urls(content):
-    # Stage 1: Use regex to find URLs
-    regex = r"(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:'\".,<>?«»“”‘’]))"
-    url = re.findall(regex, content)
-    urls = [x[0].lower() for x in url]
-
-    # Stage 2: Detect URLs from hyperlinks and possible bypasses
-    filtered = content.replace('\\', '').lower()
-    for url in urls:
-        # Remove already found URLs so we don't end up with duplicates
-        filtered = filtered.replace(url, '', 1)
-
-    for word in filtered.split():
-        # Stage 2.1: Detect URLs from hyperlinks
-        if '](' in word:
-            if word.startswith('['):
-                word = word[1:]
-            if word.endswith(')'):
-                word = word[:-1]
-            word = word.replace(')[', ' ')
-            words = word.split()
-            found = False
-            for word2 in words:
-                words2 = word2.replace('](', ' ').split()
-                for word3 in words2:
-                    if '.' in word3:
-                        if not word3.startswith('http://') or not word3.startswith('https://'):
-                            word3 = 'http://' + word3
-                        while True:
-                            try:
-                                word3 = bypass_killer(word3)
-                                if word3 is None:
-                                    break
-                            except:
-                                break
-                        if len(word3.split('.')) == 1:
-                            continue
-                        else:
-                            if word3.split('.')[1] == '':
-                                continue
-                        try:
-                            get_tld(word3.lower(), fix_protocol=True)
-                            if '](' in word3.lower():
-                                word3 = word3.replace('](', ' ', 1).split()[0]
-                            urls.append(word3.lower())
-                            found = True
-                        except:
-                            pass
-
-            if found:
-                # Hyperlink successfully found
-                continue
-
-        # Stage 2.2: Detect hyperlinks from possible bypasses
-        if '.' in word:
-            while True:
-                # I forgot how this works, but it works I guess
-                try:
-                    word_filtered = bypass_killer(word)
-                    if word_filtered is None:
-                        break
-                except:
-                    break
-
-                word = word_filtered
-
-            if len(word.split('.')) == 1:
-                continue
-            else:
-                if word.split('.')[1] == '':
-                    continue
-            try:
-                get_tld(word.lower(), fix_protocol=True)
-                if '](' in word.lower():
-                    word = word.replace('](', ' ', 1).split()[0]
-                urls.append(word.lower())
-            except:
-                pass
-
-    # Stage 3: Add missing protocols
-    for index in range(len(urls)):
-        url = urls[index]
-        if not url.startswith('http://') or not url.startswith('https://'):
-            urls[index] = 'https://' + url
-
-    return urls
 
 def check_patterns(text, patterns):
     for entry in patterns:
@@ -239,7 +144,7 @@ class Filter(beacon_filter.BeaconFilter):
 
         # Use RapidPhish to detect possible phishing URLs
         if not is_spam:
-            urls = get_urls(content)
+            urls = url_getter.get_urls(content, check_bypasses=True)
             if len(urls) > 0:
                 # Best threshold for this is 0.85
                 results = rapidphish.compare_urls(
