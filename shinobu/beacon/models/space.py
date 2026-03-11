@@ -343,7 +343,7 @@ class BeaconSpace:
             platform=server.platform,
             server_id=server.id,
             channel_id=channel.id,
-            webhook_id=webhook.id if webhook else None,
+            webhook_id=webhook.id if type(webhook) is beacon_webhook.BeaconWebhook else webhook,
             invite=invite.code if invite else None
         )
         self._members.append(new_membership)
