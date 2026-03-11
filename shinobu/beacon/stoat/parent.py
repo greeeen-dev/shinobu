@@ -38,6 +38,7 @@ class StoatBot(stoat_commands.Bot):
         self.owner_ids: list = [owner_id] if owner_id else []
 
         # Notification on whether the event handlers are working or not
+        self.stoat_is_unreliable: bool = False
         self.messages_working_notif: bool = False
 
     @property
@@ -154,7 +155,7 @@ class StoatBot(stoat_commands.Bot):
         self.register_driver()
 
     async def on_message(self, message: stoat.Message, /):
-        if not self.messages_working_notif:
+        if self.stoat_is_unreliable and not self.messages_working_notif:
             self.messages_working_notif = True
             print("Bot is receiving messages from Stoat. You don't need to reboot until messages start dropping.")
 
@@ -430,7 +431,10 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
             return
 
         print("Starting Stoat...")
-        print("Note: Stoat/stoat.py can be problematic! If messages won't bridge, reboot the bot.")
+
+        if self.stoat_is_unreliable:
+            print("Note: Stoat/stoat.py can be problematic! If messages won't bridge, reboot the bot.")
+
         token: str = await self.bot.loop.run_in_executor(None, lambda: self._shinobu_secrets.retrieve("TOKEN_STOAT"))
 
         # Start stoat bot
