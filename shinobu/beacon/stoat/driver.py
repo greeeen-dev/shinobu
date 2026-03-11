@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import math
 import stoat
 from stoat.ext import commands
 from shinobu.beacon.protocol import messages as beacon_messages
@@ -162,9 +163,9 @@ class StoatDriver(beacon_driver.BeaconDriver):
             webhook_id=None
         )
 
-    @staticmethod
-    async def _to_stoat_content(content: beacon_message.BeaconMessageContent,
-                                destination: beacon_messageable.BeaconMessageable) -> StoatMessageContent:
+    async def _to_stoat_content(self, content: beacon_message.BeaconMessageContent,
+                                destination: beacon_messageable.BeaconMessageable, compatibility: bool = False
+                                ) -> StoatMessageContent:
         # Content
         embeds: list[stoat_embed.Embed] = []
         replies: list[stoat.Message | stoat.Reply] = []
@@ -197,9 +198,14 @@ class StoatDriver(beacon_driver.BeaconDriver):
             # Add to replies
             replies.append(reply_obj)
 
+        # Get final content
+        final_content: str = "\n".join(text_components)
+        if compatibility:
+            final_content = self._sanitize_inbound_compat(final_content)
+
         # Assemble to StoatMessageContent
         return StoatMessageContent(
-            content="\n".join(text_components),
+            content=final_content,
             files=files,
             embeds=embeds,
             replies=replies
@@ -270,6 +276,25 @@ class StoatDriver(beacon_driver.BeaconDriver):
         # Return content
         return content
 
+    @staticmethod
+    def _sanitize_inbound_compat(content: str) -> str:
+        # Detect spoilered content
+        components: list[str] = content.split('||')
+
+        if len(components) >= 3:
+            all_spoilers: int = int(len(components) / 2)
+            if len(components) % 2 == 0:
+                # This is even
+                all_spoilers = all_spoilers - 1
+
+            if all_spoilers >= 0:
+                for spoiler in range(all_spoilers):
+                    index: int = 1 + (spoiler * 2)
+                    components[index] = f'!!||{components[index]}||!!'
+
+        return ''.join(components)
+
+
     # Beacon driver functions
     def get_user(self, user_id: str):
         user = self.bot.get_user(user_id)
@@ -325,7 +350,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None, self_send: bool = False):
+                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False):
         # Get message options
         send_as_user: bool = send_as is not None
 
@@ -338,7 +363,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
             custom_avatar = send_as.avatar_url
 
         # Convert message content data
-        stoat_content: StoatMessageContent = await self._to_stoat_content(content, destination)
+        stoat_content: StoatMessageContent = await self._to_stoat_content(content, destination, compatibility=compatibility)
 
         # Convert bot user to BeaconUser
         self_user = self.get_user(self.bot.user.id)
@@ -396,12 +421,13 @@ class StoatDriver(beacon_driver.BeaconDriver):
             webhook_id=None
         )
 
-    async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent):
+    async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
+                    compatibility: bool = False):
         channel = self.bot.get_channel(message.channel.id)
         message_obj = await channel.fetch_message(message.id)
 
         # Convert message content data
-        stoat_content: StoatMessageContent = await self._to_stoat_content(content, destination=message.channel)
+        stoat_content: StoatMessageContent = await self._to_stoat_content(content, destination=message.channel, compatibility=compatibility)
 
         # Edit message
         await message_obj.edit(

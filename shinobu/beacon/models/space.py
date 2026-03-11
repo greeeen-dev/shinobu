@@ -26,7 +26,8 @@ class BeaconSpaceNotJoined(Exception):
     pass
 
 class BeaconSpaceBanned(Exception):
-    pass
+    def __init__(self, server: beacon_server.BeaconServer):
+        super().__init__(f"Server {server.name} (ID {server.id}) is banned from this Space")
 
 class BeaconSpaceInvalidInvite(Exception):
     pass
@@ -193,7 +194,7 @@ class BeaconSpace:
                  partial_members: list| None = None, invites: list | None = None, bans: list | None = None,
                  private: bool = False, nsfw: bool = False, private_owner_id: str | None = None,
                  relay_deletes: bool = True, relay_edits: bool = True, relay_large_attachments: bool = True,
-                 filters: list | None = None, filter_configs: dict | None = None):
+                 compatibility: bool = False, filters: list | None = None, filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
         self._emoji: str = space_emoji
@@ -208,7 +209,8 @@ class BeaconSpace:
         self._nsfw: bool = nsfw
         self._deletes: bool = relay_deletes
         self._edits: bool = relay_edits
-        self._attachments_url = relay_large_attachments
+        self._attachments_url: bool = relay_large_attachments
+        self._compatibility: bool = compatibility
         self._filters: list = filters or []
         self._filter_configs: dict = filter_configs or {}
 
@@ -261,6 +263,10 @@ class BeaconSpace:
         return self._attachments_url
 
     @property
+    def compatibility(self) -> bool:
+        return self._compatibility
+
+    @property
     def filters(self) -> list:
         return self._filters
 
@@ -292,6 +298,9 @@ class BeaconSpace:
              force: bool = False):
         """Joins a Space."""
 
+        # Note: force should only be used for instance moderators.
+        # This should not be set to True for normal users.
+
         # Create membership object
         new_membership: BeaconSpaceMember = BeaconSpaceMember(
             platform=server.platform,
@@ -305,9 +314,9 @@ class BeaconSpace:
         if new_membership in self._members:
             raise BeaconSpaceAlreadyJoined("Already a member of this Space")
 
-        # Check if server is banned
-        if self.is_banned(server):
-            raise BeaconSpaceBanned("Server is banned from this Space")
+        # Check if server is banned (unless forcibly joining)
+        if self.is_banned(server) and not force:
+            raise BeaconSpaceBanned(server)
         
         # Check invite for private rooms (unless forcibly joining)
         if self.private and not force:
@@ -330,11 +339,20 @@ class BeaconSpace:
                 self.invites.remove(invite)
         
         # Join space
+        self.partial_join(
+            platform=server.platform,
+            server_id=server.id,
+            channel_id=channel.id,
+            webhook_id=webhook.id if webhook else None,
+            invite=invite.code if invite else None
+        )
         self._members.append(new_membership)
 
-    def partial_join(self, platform: str, server_id: str, channel_id: str, webhook_id: str, invite: str | None = None):
-        """Joins as a partial member. This is only to be used for restore operations
-        when the platform driver isn't available."""
+    def partial_join(self, platform: str, server_id: str, channel_id: str, webhook_id: str | None = None,
+                     invite: str | None = None):
+        """Joins as a partial member. This is to be used as the source of truth for
+        backup operations so data is not lost even if the platform is partially or
+        fully unavailable."""
 
         # Create new partial membership object
         new_membership: BeaconPartialSpaceMember = BeaconPartialSpaceMember(
@@ -375,7 +393,7 @@ class BeaconSpace:
             "id": self.id,
             "name": self.name,
             "emoji": self.emoji,
-            "members": self.members.copy() + self.partial_members.copy(),
+            "members": self.partial_members.copy(),
             "invites": self.invites.copy(),
             "bans": self.bans.copy(),
             "options": {
@@ -384,6 +402,7 @@ class BeaconSpace:
                 "relay_deletes": self.relay_deletes,
                 "relay_edits": self.relay_edits,
                 "convert_large_files": self.convert_large_files,
+                "compatibility": self.compatibility,
             }
         }
 

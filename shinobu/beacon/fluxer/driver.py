@@ -383,7 +383,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
     # noinspection DuplicatedCode
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None, self_send: bool = False):
+                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None

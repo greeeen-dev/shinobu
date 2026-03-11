@@ -19,7 +19,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import io
 import uuid
 import discord
-from datetime import datetime
+import orjson
+import aiohttp
+from datetime import datetime, timedelta
 from discord.ext import bridge
 from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
@@ -202,7 +204,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         self._supports_agegate = True
 
         # Disable aiomultiprocess for now
-        self._supports_multi = False
+        self._supports_multi = True
 
         # Components v2 flag
         self._use_components_v2: bool = True
@@ -602,7 +604,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None, self_send: bool = False):
+                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None
@@ -666,15 +668,18 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             if not target:
                 return None
 
-            message = await webhook_obj.send(
-                content=discord_content.content,
-                view=discord_content.components,
-                embeds=discord_content.embeds,
-                files=discord_content.files,
-                username=custom_name,
-                avatar_url=custom_avatar,
-                wait=True
-            )
+            # noinspection PyTypeChecker
+            async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
+                webhook_obj.session = session
+                message = await webhook_obj.send(
+                    content=discord_content.content,
+                    view=discord_content.components,
+                    embeds=discord_content.embeds,
+                    files=discord_content.files,
+                    username=custom_name,
+                    avatar_url=custom_avatar,
+                    wait=True
+                )
         else:
             if not target:
                 return None
@@ -699,7 +704,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             webhook_id=webhook_id if webhook_obj else None
         )
 
-    async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent):
+    async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
+                    compatibility: bool = False):
         channel = self.bot.get_channel(int(message.channel.id))
 
         # Convert message content data
@@ -760,3 +766,18 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
             # Delete message
             await message_obj.delete()
+
+    async def _purge(self, messages: list[beacon_message.BeaconMessage]):
+        # Get datetime for two weeks ago
+        earliest_datetime: datetime = datetime.now() - timedelta(days=14)
+
+        # Create message ID list
+        message_ids: list[int] = [int(message.id) for message in messages]
+
+        # Purge messages
+        channel: discord.TextChannel = self.bot.get_channel(int(messages[0].channel.id))
+
+        def check(message: discord.Message):
+            return message.id in message_ids
+
+        await channel.purge(after=earliest_datetime, check=check)

@@ -16,9 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import sys
 import asyncio
-import aiomultiprocess
 import uuid
 from enum import Enum
 from discord.ext import bridge
@@ -28,11 +26,6 @@ from shinobu.beacon.models import (space as beacon_space, message as beacon_mess
                                    filter as beacon_filter, member as beacon_member, channel as beacon_channel,
                                    driver as beacon_driver, server as beacon_server, user as beacon_user)
 from shinobu.runtime.secrets import fine_grained
-
-# Set start method to fork
-# This is not supported on Windows
-if sys.platform != "win32":
-    aiomultiprocess.set_start_method("fork")
 
 class BeaconMessageBlockedReason(Enum):
     bridge_paused = 1
@@ -46,10 +39,32 @@ class BeaconPlatformDisabled(Exception):
     def __init__(self, platform: str):
         super().__init__(f"The resource is not available because {platform} is disabled.")
 
+class BeaconCallback:
+    def __init__(self, func, args: list | None = None, kwargs: dict | None = None):
+        self._func = func
+        self._args: list = args or []
+        self._kwargs: dict = kwargs or {}
+
+    @property
+    def coroutine(self):
+        return self._func(*self._args, **self._kwargs)
+
+    @property
+    def func(self):
+        return self._func
+
+    @property
+    def args(self) -> list:
+        return self._args
+
+    @property
+    def kwargs(self) -> dict:
+        return self._kwargs
+
 class Beacon:
     def __init__(self, bot: bridge.Bot, files_wrapper: fine_grained.FineGrainedSecureFiles, config: dict | None = None,
                  enable_multi: bool = True):
-        self._enable_multi: bool = enable_multi and False # We'll clamp this to False for now
+        self._enable_multi: bool = enable_multi
         self.__wrapper: fine_grained.FineGrainedSecureFiles = files_wrapper
         self.__bot: bridge.Bot = bot
         self._config: dict = config or {}
@@ -68,12 +83,6 @@ class Beacon:
         self._spaces: beacon_spaces.BeaconSpaceManager = beacon_spaces.BeaconSpaceManager()
         self._messages: beacon_messages.BeaconMessageCache = beacon_messages.BeaconMessageCache(self.__wrapper)
         self._filters: beacon_filters.BeaconFilterManager = beacon_filters.BeaconFilterManager()
-
-        # Create aiomultiprocess pool if available and enabled
-        self._pool: aiomultiprocess.Pool | None = None
-
-        if sys.platform != "win32" and self._enable_multi:
-            self._pool = aiomultiprocess.Pool()
 
     @property
     def initialized(self) -> bool:
@@ -125,41 +134,24 @@ class Beacon:
         self._disabled_platforms.append(platform)
 
     @staticmethod
-    async def _strategy_sequential(callbacks: list) -> list:
+    async def _strategy_sequential(callbacks: list[BeaconCallback]) -> list:
         """Sequentially executes asynchronous callbacks."""
 
         results = []
         for callback in callbacks:
-            result = await callback()
+            result = await callback.coroutine()
             results.append(result)
 
         return results
 
-    async def _strategy_async(self, callbacks: list, return_exceptions: bool = False) -> list:
+    async def _strategy_async(self, callbacks: list[BeaconCallback], return_exceptions: bool = False) -> list:
         """Concurrently executes asynchronous callbacks."""
 
-        tasks = [asyncio.create_task(callback) for callback in callbacks]
+        tasks = [asyncio.create_task(callback.coroutine) for callback in callbacks]
 
         # Add task to tasks list
         self._bridge_tasks.update({str(uuid.uuid4()): [tasks]})
 
-        return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
-
-    async def _strategy_multi(self, callbacks: list, return_exceptions: bool = False) -> list:
-        """Uses aiomultiprocess to execute asynchronous callbacks in parallel.
-        Falls back to _strategy_async if unavailable."""
-
-        if not self._pool:
-            # Pool doesn't exist, multicore is likely unavailable or disabled.
-            # Fallback to standard async
-            return await self._strategy_async(callbacks, return_exceptions=return_exceptions)
-
-        tasks = []
-
-        for callback in callbacks:
-            tasks.append(self._pool.apply(callback))
-
-        # Run tasks in pool (and return result)
         return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
     def cancel_pending_tasks(self):
@@ -201,6 +193,7 @@ class Beacon:
                 relay_deletes=space_data.get("options", {}).get("relay_deletes"),
                 relay_edits=space_data.get("options", {}).get("relay_edits"),
                 relay_large_attachments=space_data.get("options", {}).get("convert_large_files"),
+                compatibility=space_data.get("options", {}).get("compatibility"),
                 filters=space_data.get("options", {}).get("filters"),
                 filter_configs=space_data.get("options", {}).get("filter_configs")
             )
@@ -214,7 +207,7 @@ class Beacon:
                 platform_driver: beacon_driver.BeaconDriver = self.drivers.get_driver(member["platform"])
 
                 if not platform_driver:
-                    # Join as "partial" member
+                    # Add "partial" member only
                     space.partial_join(
                         platform=member["platform"],
                         server_id=member["server"],
@@ -226,22 +219,21 @@ class Beacon:
 
                 # Get server
                 server: beacon_server.BeaconServer | None = platform_driver.get_server(member["server"])
+                channel: beacon_channel.BeaconChannel | None = None
 
                 if server:
-                    channel: beacon_channel.BeaconChannel | None = platform_driver.get_channel(server, member["channel"])
-                else:
-                    # We can't import this server, so make a dummy server
-                    server = beacon_server.BeaconServer(
+                    channel = platform_driver.get_channel(server, member["channel"])
+
+                if not server or not channel:
+                    # We can't import this server or channel, so we'll just have to add it as a partial member
+                    space.partial_join(
+                        platform=member["platform"],
                         server_id=member["server"],
-                        platform=member["platform"],
-                        name="Unknown server"
-                    )
-                    channel: beacon_channel.BeaconChannel | None = beacon_channel.BeaconChannel(
                         channel_id=member["channel"],
-                        platform=member["platform"],
-                        name="Unknown channel",
-                        server=server
+                        webhook_id=member["webhook"],
+                        invite=member["invite"]
                     )
+                    continue
 
                 # Add member entry
                 space.join(
@@ -410,16 +402,20 @@ class Beacon:
         space_members: list[beacon_space.BeaconSpaceMember] = [
             member for member in space.members if member.platform == driver.platform
         ]
-        tasks = []
+        tasks: list[BeaconCallback] = []
 
         for member in space_members:
-            tasks.append(driver.send(
-                member.channel, content, send_as=author, webhook_id=member.webhook_id, self_send=self_send
-            ))
+            task: BeaconCallback = BeaconCallback(
+                driver.send,
+                [member.channel, content],
+                {
+                    "send_as": author, "webhook_id": member.webhook_id, "self_send": self_send,
+                    "compatibility": True #space.compatibility
+                }
+            )
+            tasks.append(task)
 
-        if driver.supports_multi:
-            results: list[beacon_message.BeaconMessage] = await self._strategy_multi(tasks, return_exceptions=False)
-        elif driver.supports_async:
+        if driver.supports_async:
             results: list[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=False)
         else:
             results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
@@ -436,14 +432,23 @@ class Beacon:
         platform_messages: list[beacon_message.BeaconMessage] = [
             message for _, message in message_group.messages.items() if message.platform == driver.platform and message.id != content.original_id
         ]
-        tasks = []
+        tasks: list[BeaconCallback] = []
+
+        space: beacon_space.BeaconSpace | None = self.spaces.get_space(message_group.space_id)
+        compatibility: bool = False
+
+        if space:
+            compatibility = space.compatibility
 
         for message in platform_messages:
-            tasks.append(driver.edit(message, content))
+            task: BeaconCallback = BeaconCallback(
+                driver.edit,
+                [message, content],
+                {"compatibility": compatibility}
+            )
+            tasks.append(task)
 
-        if driver.supports_multi:
-            await self._strategy_multi(tasks, return_exceptions=False)
-        elif driver.supports_async:
+        if driver.supports_async:
             await self._strategy_async(tasks, return_exceptions=False)
         else:
             await self._strategy_sequential(tasks)
@@ -458,11 +463,42 @@ class Beacon:
         tasks = []
 
         for message in platform_messages:
-            tasks.append(driver.delete(message))
+            task: BeaconCallback = BeaconCallback(
+                driver.delete,
+                [message]
+            )
+            tasks.append(task)
 
-        if driver.supports_multi:
-            await self._strategy_multi(tasks, return_exceptions=False)
-        elif driver.supports_async:
+        if driver.supports_async:
+            await self._strategy_async(tasks, return_exceptions=False)
+        else:
+            await self._strategy_sequential(tasks)
+
+    async def _purge_platform(self, driver: beacon_driver.BeaconDriver,
+                              message_groups: list[beacon_message.BeaconMessageGroup]):
+        platform_channel_messages: dict[str, list[beacon_message.BeaconMessage]] = {}
+
+        # Get messages
+        for message_group in message_groups:
+            for message in message_group.messages.values():
+                if message.platform != driver.platform:
+                    continue
+
+                if message.channel.id not in platform_channel_messages:
+                    platform_channel_messages.update({message.channel.id: []})
+
+                platform_channel_messages[message.channel.id].append(message)
+
+        # Purge for each channel
+        tasks = []
+        for channel_messages in platform_channel_messages.values():
+            task: BeaconCallback = BeaconCallback(
+                driver.purge,
+                [channel_messages]
+            )
+            tasks.append(task)
+
+        if driver.supports_async:
             await self._strategy_async(tasks, return_exceptions=False)
         else:
             await self._strategy_sequential(tasks)
@@ -507,7 +543,11 @@ class Beacon:
                 continue
 
             driver = self._drivers.get_driver(platform)
-            tasks.append(self._send_platform(driver, author, space, content))
+            task: BeaconCallback = BeaconCallback(
+                self._send_platform,
+                args=[driver, author, space, content]
+            )
+            tasks.append(task)
 
         # Bridge to platforms
         results: list[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=False)
@@ -633,3 +673,39 @@ class Beacon:
         # Remove message group from cache
         # noinspection PyTypeChecker
         await self.__bot.loop.run_in_executor(None, lambda: self.messages.remove_message_group(message_group))
+
+    async def purge(self, messages: list[beacon_message.BeaconMessage]):
+        """Purges messages sent to a Space."""
+
+        if not self.initialized:
+            raise BeaconNotInit()
+
+        if messages[0].platform in self._disabled_platforms:
+            raise BeaconPlatformDisabled(messages[0].platform)
+
+        # Get message groups
+        message_groups: list[beacon_message.BeaconMessageGroup] = []
+        for message in messages:
+            message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
+            if not message_group:
+                # We can't do anything with uncached messages
+                return
+
+            message_groups.append(message_group)
+
+        # Edit message for each platform
+        tasks = []
+        for platform in self._drivers.platforms:
+            if platform in self._disabled_platforms:
+                continue
+
+            driver = self._drivers.get_driver(platform)
+            tasks.append(self._purge_platform(driver, message_groups))
+
+        # Bridge to platforms
+        await self._strategy_async(tasks, return_exceptions=False)
+
+        # Remove message groups from cache
+        for message_group in message_groups:
+            # noinspection PyTypeChecker
+            await self.__bot.loop.run_in_executor(None, lambda: self.messages.remove_message_group(message_group))

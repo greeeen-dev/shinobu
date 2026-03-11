@@ -83,7 +83,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
         discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
-        # Get Beacon objects for server. channel and webhook
+        # Get Beacon objects for server, channel and webhook
         server_obj: beacon_server.BeaconServer = discord_driver.get_server(str(ctx.guild.id))
         channel_obj: beacon_channel.BeaconChannel = discord_driver.get_channel(server_obj, str(ctx.channel.id))
 
@@ -112,6 +112,50 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
         await ctx.send("space joined! :3")
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
+
+    @bridge_text.command(name="leave-space")
+    @commands.is_owner()
+    async def leave_space(self, ctx: commands.Context, space_id: str):
+        # noinspection DuplicatedCode
+        space: beacon_space.BeaconSpace | None = self._beacon.spaces.get_space(space_id)
+
+        if not space:
+            return await ctx.send("could not find space :c")
+
+        discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+
+        # Get Beacon server obect
+        server_obj: beacon_server.BeaconServer = discord_driver.get_server(str(ctx.guild.id))
+
+        # Get space membership
+        membership: beacon_space.BeaconSpaceMember | None = space.get_member(server_obj)
+        if not membership:
+            return await ctx.send("you are not a member of this space :/")
+
+        # Get webhook
+        webhook: discord.Webhook | None = None
+
+        # noinspection PyBroadException
+        try:
+            await discord_driver.getch_webhook(membership.webhook_id)
+        except:
+            pass
+        else:
+            webhook = discord_driver.webhooks.get_webhook(membership.webhook_id)
+
+        # Leave space
+        try:
+            space.leave(membership)
+        except beacon_space.BeaconSpaceNotJoined:
+            # This should not raise, but let's handle it anyway
+            return await ctx.send("you are not a member of this space :/")
+
+        await ctx.send("space left :<")
+        await self.bot.loop.run_in_executor(None, self._beacon.save_data)
+
+        # Delete webhook
+        if webhook:
+            await webhook.delete()
 
 def get_cog_type():
     return BeaconFrontend

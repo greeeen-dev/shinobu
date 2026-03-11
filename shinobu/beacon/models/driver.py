@@ -23,11 +23,15 @@ from shinobu.beacon.models import (user as beacon_user, channel as beacon_channe
 
 class BeaconDriverUnsupported(Exception):
     def __init__(self):
-        super().__init__("Driver does not support this feature.")
+        super().__init__("Driver does not support this feature")
 
 class BeaconDriverPlatformMismatch(Exception):
     def __init__(self, platform: str):
-        super().__init__(f"Driver does not support platform {platform}.")
+        super().__init__(f"Driver does not support platform {platform}")
+
+class BeaconDriverChannelMismatch(Exception):
+    def __init__(self, expected: str, got: str):
+        super().__init__(f"Expected channel ID {expected}, got {got}")
 
 class BeaconDriverWebhookCache:
     """Built-in driver webhook cache.
@@ -103,16 +107,22 @@ class BeaconDriver:
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None, self_send: bool = False) -> beacon_message.BeaconMessage:
+                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False
+                   ) -> beacon_message.BeaconMessage:
         """Sends a message to a given destination."""
         raise BeaconDriverUnsupported()
 
-    async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent):
+    async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
+                    compatibility: bool = False):
         """Edits a message."""
         raise BeaconDriverUnsupported()
 
     async def _delete(self, message: beacon_message.BeaconMessage):
         """Deletes a message."""
+        raise BeaconDriverUnsupported()
+
+    async def _purge(self, messages: list[beacon_message.BeaconMessage]):
+        """Purges messages from a channel."""
         raise BeaconDriverUnsupported()
 
     def sanitize_inbound(self, content: str) -> str:
@@ -197,7 +207,8 @@ class BeaconDriver:
         else:
             return self._file_limit
 
-    async def edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent):
+    async def edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
+                   compatibility: bool = False):
         """Edits a message."""
 
         # NOTE: You will need to overwrite BeaconDriver._edit for this to work.
@@ -205,7 +216,7 @@ class BeaconDriver:
         if message.platform != self.platform:
             raise BeaconDriverPlatformMismatch(message.platform)
 
-        return await self._edit(message, content)
+        return await self._edit(message, content, compatibility=compatibility)
 
     async def delete(self, message: beacon_message.BeaconMessage):
         """Deletes a message."""
@@ -216,3 +227,21 @@ class BeaconDriver:
             raise BeaconDriverPlatformMismatch(message.platform)
 
         return await self._delete(message)
+
+    async def purge(self, messages: list[beacon_message.BeaconMessage]):
+        """Deletes a message."""
+
+        # NOTE: You will need to overwrite BeaconDriver._purge for this to work.
+
+        # We'll need ALL messages to match the platform and have the same channel
+        channel_id: str | None = None
+        for message in messages:
+            if message.platform != self.platform:
+                raise BeaconDriverPlatformMismatch(message.platform)
+
+            if not channel_id:
+                channel_id = message.channel.id
+            elif channel_id != message.channel.id:
+                raise BeaconDriverChannelMismatch(channel_id, message.channel.id)
+
+        return await self._purge(messages)

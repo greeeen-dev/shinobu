@@ -222,6 +222,10 @@ class StoatBot(stoat_commands.Bot):
         partial_message: stoat.PartialMessage = event.message
         message: stoat.Message = partial_message.channel.get_message(partial_message.id)
 
+        if not message:
+            # We can't do much here
+            return
+
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
 
         # Get the BeaconMessage object for the message
