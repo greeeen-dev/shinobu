@@ -28,6 +28,9 @@ from shinobu.beacon.models import (driver as beacon_driver, file as beacon_file,
                                    message as beacon_message, server as beacon_server, channel as beacon_channel,
                                    member as beacon_member, space as beacon_space)
 
+# If Stoat or stoat.py is having issues, enable this to show a warning
+stoat_is_unreliable: bool = False
+
 class StoatBot(stoat_commands.Bot):
     def __init__(self, beacon_obj: beacon.Beacon, driver_obj: stoat_driver.StoatDriver, *args,
                  owner_id: str | None = None, **kwargs):
@@ -38,7 +41,6 @@ class StoatBot(stoat_commands.Bot):
         self.owner_ids: list = [owner_id] if owner_id else []
 
         # Notification on whether the event handlers are working or not
-        self.stoat_is_unreliable: bool = False
         self.messages_working_notif: bool = False
 
     @property
@@ -155,7 +157,7 @@ class StoatBot(stoat_commands.Bot):
         self.register_driver()
 
     async def on_message(self, message: stoat.Message, /):
-        if self.stoat_is_unreliable and not self.messages_working_notif:
+        if stoat_is_unreliable and not self.messages_working_notif:
             self.messages_working_notif = True
             print("Bot is receiving messages from Stoat. You don't need to reboot until messages start dropping.")
 
@@ -432,7 +434,7 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
 
         print("Starting Stoat...")
 
-        if self.stoat_is_unreliable:
+        if stoat_is_unreliable:
             print("Note: Stoat/stoat.py can be problematic! If messages won't bridge, reboot the bot.")
 
         token: str = await self.bot.loop.run_in_executor(None, lambda: self._shinobu_secrets.retrieve("TOKEN_STOAT"))
