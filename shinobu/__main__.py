@@ -24,6 +24,7 @@ import argparse
 import ujson as json
 import orjson
 import getpass
+import uuid
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -132,6 +133,7 @@ class SecretsIssuingAuthority:
     def __init__(self):
         self._wrappers_secrets: dict = {}
         self._wrappers_files: dict = {}
+        self._wrappers_uuids: dict = {}
         self._cogs_wrapper_map_secrets: dict = {}
         self._cogs_wrapper_map_files: dict = {}
         self._cogs_registered_secrets: dict | None = None
@@ -175,6 +177,15 @@ class SecretsIssuingAuthority:
 
         return not invalid_entitlements
 
+    def _validate_wrapper(self, wrapper: fine_grained.FineGrainedWrapper):
+        # Check 1: Ensure wrapper is valid
+        if id(wrapper) not in self._wrappers_secrets.keys():
+            raise ValueError("Wrapper is either invalid or revoked")
+
+        # Check 2: Check UUIDs of wrapper
+        if wrapper.uuid != self._wrappers_uuids[id(wrapper)]:
+            raise ValueError("Wrapper UUID mismatch")
+
     def _load_manifest(self, filepath):
         # Read plugin data
         data: dict = plugins_data.get(filepath)
@@ -202,7 +213,7 @@ class SecretsIssuingAuthority:
         entitlements_files_valid = self._sanity_check(entitlements_files)
 
         # Just to be strict, we'll enforce both entitlements to be valid
-        if not entitlements_secrets_valid and entitlements_files_valid:
+        if not entitlements_secrets_valid or not entitlements_files_valid:
             return
 
         # Grant entitlements
@@ -299,12 +310,15 @@ class SecretsIssuingAuthority:
                 raise ValueError(f"Entitlement to file {entitlement} already issued")
 
         # Issue entitlements
+        wrapper_uuid: str = str(uuid.uuid4())
         if is_file:
-            wrapper: fine_grained.FineGrainedSecureFiles = ActualFineGrainedSecureFiles()
+            wrapper: fine_grained.FineGrainedSecureFiles = ActualFineGrainedSecureFiles(wrapper_uuid)
+            self._wrappers_uuids.update({id(wrapper): wrapper_uuid})
             self._wrappers_files.update({id(wrapper): requested_entitlements})
             self._accessed_files.update(requested_entitlements)
         else:
-            wrapper: fine_grained.FineGrainedSecrets = ActualFineGrainedSecrets()
+            wrapper: fine_grained.FineGrainedSecrets = ActualFineGrainedSecrets(wrapper_uuid)
+            self._wrappers_uuids.update({id(wrapper): wrapper_uuid})
             self._wrappers_secrets.update({id(wrapper): requested_entitlements})
             self._accessed_secrets.update(requested_entitlements)
 
@@ -314,8 +328,7 @@ class SecretsIssuingAuthority:
         """Retrieves a secret for a FineGrainedSecrets object."""
 
         # Ensure wrapper is valid
-        if id(wrapper) not in self._wrappers_secrets.keys():
-            raise ValueError("Wrapper is either invalid or revoked")
+        self._validate_wrapper(wrapper)
 
         # Get wrapper entitlements
         wrapper_entitlements = self._wrappers_secrets.get(id(wrapper), [])
@@ -331,8 +344,7 @@ class SecretsIssuingAuthority:
         """Checks if a wrapper has entitlements to a file."""
 
         # Ensure wrapper is valid
-        if id(wrapper) not in self._wrappers_files.keys():
-            raise ValueError("Wrapper is either invalid or revoked")
+        self._validate_wrapper(wrapper)
 
         # Get wrapper entitlements
         wrapper_entitlements = self._wrappers_files.get(id(wrapper), [])

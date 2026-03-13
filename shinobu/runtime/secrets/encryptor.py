@@ -383,7 +383,7 @@ class XChaCha20Encryptor(BaseEncryptor):
         for index in range(len(key)):
             key[index] = 0
 
-        # Return GCMEncryptedData object
+        # Return XChaCha20EncryptedData object
         return XChaCha20EncryptedData(
             ciphertext=base64.b64encode(result).decode('ascii'),
             tag=base64.b64encode(tag).decode('ascii'),

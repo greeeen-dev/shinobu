@@ -24,6 +24,13 @@ from shinobu.runtime.secrets.encryptor import EncryptedData
 class FineGrainedWrapper:
     """Base class for FineGrainedSecrets and FineGrainedSecureFiles."""
 
+    def __init__(self, uuid: str):
+        self.__uuid = uuid
+
+    @property
+    def uuid(self):
+        return self.__uuid
+
 class FineGrainedSecrets(FineGrainedWrapper):
     """Fine-grained secrets."""
 
