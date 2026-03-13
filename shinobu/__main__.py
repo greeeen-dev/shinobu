@@ -179,8 +179,12 @@ class SecretsIssuingAuthority:
 
     def _validate_wrapper(self, wrapper: fine_grained.FineGrainedWrapper):
         # Check 1: Ensure wrapper is valid
-        if id(wrapper) not in self._wrappers_secrets.keys():
-            raise ValueError("Wrapper is either invalid or revoked")
+        if (
+                type(wrapper) is fine_grained.FineGrainedSecrets and id(wrapper) not in self._wrappers_secrets.keys()
+        ) or (
+                type(wrapper) is fine_grained.FineGrainedSecureFiles and id(wrapper) not in self._wrappers_files.keys()
+        ):
+                raise ValueError("Wrapper is either invalid or revoked")
 
         # Check 2: Check UUIDs of wrapper
         if wrapper.uuid != self._wrappers_uuids[id(wrapper)]:
