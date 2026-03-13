@@ -24,13 +24,14 @@ from Crypto.Random import random
 from shinobu.runtime.secrets import encryptor
 
 class RawEncryptor:
-    """A raw encryptor"""
+    """A raw encryptor, usually used for file encryption."""
+
     def __init__(self, password):
         self.__password = password
         self.__encryptor: encryptor.AutoEncryptor = encryptor.AutoEncryptor()
 
-    def encrypt(self, data) -> encryptor.EncryptedData:
-        return self.__encryptor.encrypt(data, self.__password)
+    def encrypt(self, data, kdf_profile: str | None = None) -> encryptor.EncryptedData:
+        return self.__encryptor.encrypt(data, self.__password, profile=kdf_profile)
 
     def decrypt(self, encrypted_data: encryptor.EncryptedData) -> str:
         return self.__encryptor.decrypt(encrypted_data, self.__password)

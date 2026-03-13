@@ -31,6 +31,7 @@ from shinobu.runtime import runtime
 from shinobu.runtime.secrets import manager, fine_grained, encryptor
 from shinobu.runtime.models import shinobu_cog
 from shinobu.cli import secrets as secrets_cli, installer as installer_cli
+from shinobu.runtime.secrets.encryptor import EncryptedData
 
 # Manifest path
 manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
@@ -374,6 +375,19 @@ class SecretsIssuingAuthority:
             # noinspection PyTypeChecker
             json.dump(encrypted_data.to_dict(), file)
 
+    def export(self, wrapper: fine_grained.FineGrainedSecureFiles, filename: str, data: str,
+               use_strong_kdf: bool = True) -> EncryptedData:
+        # Ensure wrapper has entitlements
+        self._check_file_entitlement(wrapper, filename)
+
+        # Use argon2_high where possible
+        kdf_profile: str = "argon2_low"
+        if use_strong_kdf and "argon2_high" in encryptor.argon2_available:
+            kdf_profile = "argon2_high"
+
+        # Return encrypted data
+        return raw_encryptor.encrypt(data, kdf_profile=kdf_profile)
+
 # Create variable for SecretsIssuingAuthority (do not initialize yet)
 secrets_authority: SecretsIssuingAuthority | None = None
 
@@ -406,6 +420,14 @@ class ActualFineGrainedSecureFiles(fine_grained.FineGrainedSecureFiles):
 
     def save_json(self, filename: str, data: dict):
         secrets_authority.save(self, filename, orjson.dumps(data).decode())
+
+    def export(self, filename: str, data: str, use_strong_kdf: bool = True) -> EncryptedData | None:
+        return secrets_authority.export(self, filename, data, use_strong_kdf=use_strong_kdf)
+
+    def export_json(self, filename: str, data: dict, use_strong_kdf: bool = True) -> EncryptedData | None:
+        return secrets_authority.export(
+            self, filename, orjson.dumps(data).decode(), use_strong_kdf=use_strong_kdf
+        )
 
 class ExtensionCogMap:
     """Keeps track of extensions and its cogs."""

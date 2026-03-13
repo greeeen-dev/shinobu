@@ -16,6 +16,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from shinobu.runtime.secrets.encryptor import EncryptedData
+
 # Note: This class is only to be used for typing in development. It does absolutely nothing
 # except providing the structure of the secrets wrapper.
 
@@ -47,3 +49,11 @@ class FineGrainedSecureFiles(FineGrainedWrapper):
     def save_json(self, filename: str, data: dict):
         """Saves a dict object to a secure file."""
         return
+
+    def export(self, filename: str, data: str, use_strong_kdf: bool = True) -> EncryptedData | None:
+        """Exports secure file data as an EncryptedData object."""
+        return None
+
+    def export_json(self, filename: str, data: dict, use_strong_kdf: bool = True) -> EncryptedData | None:
+        """Exports secure file data as an EncryptedData object."""
+        return None
