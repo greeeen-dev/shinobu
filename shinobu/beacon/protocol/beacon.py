@@ -638,7 +638,11 @@ class Beacon:
                 continue
 
             driver = self._drivers.get_driver(platform)
-            tasks.append(self._edit_platform(driver, message_group, content))
+            task: BeaconCallback = BeaconCallback(
+                self._edit_platform,
+                args=[driver, message_group, content]
+            )
+            tasks.append(task)
 
         # Bridge to platforms
         await self._strategy_async(tasks, return_exceptions=False)
@@ -665,7 +669,11 @@ class Beacon:
                 continue
 
             driver = self._drivers.get_driver(platform)
-            tasks.append(self._delete_platform(driver, message_group, message))
+            task: BeaconCallback = BeaconCallback(
+                self._delete_platform,
+                args=[driver, message_group, message]
+            )
+            tasks.append(task)
 
         # Bridge to platforms
         await self._strategy_async(tasks, return_exceptions=False)
@@ -700,7 +708,11 @@ class Beacon:
                 continue
 
             driver = self._drivers.get_driver(platform)
-            tasks.append(self._purge_platform(driver, message_groups))
+            task: BeaconCallback = BeaconCallback(
+                self._purge_platform,
+                args=[driver, message_groups]
+            )
+            tasks.append(task)
 
         # Bridge to platforms
         await self._strategy_async(tasks, return_exceptions=False)
