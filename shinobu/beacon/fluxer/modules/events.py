@@ -308,8 +308,12 @@ class FluxerEvents(cog.Cog):
             # We can't remove messages that aren't cached
             return
 
+        # Check if author ID exists
+        if not message.get("author_id"):
+            return
+
         # Did we bridge this message?
-        if message["webhook_id"]:
+        if message.get("webhook_id"):
             if message_obj.author.id != str(message["webhook_id"]):
                 # We probably did
                 return
