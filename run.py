@@ -17,6 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 # An intermediate script for running Shinobu with the configured Python install or venv.
+# If you know what you are doing, you can just use python -m shinobu instead of using run.sh.
 
 import os
 import sys

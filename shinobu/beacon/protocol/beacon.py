@@ -144,7 +144,7 @@ class Beacon:
 
         return results
 
-    async def _strategy_async(self, callbacks: list[BeaconCallback], return_exceptions: bool = False) -> list:
+    async def _strategy_async(self, callbacks: list[BeaconCallback], return_exceptions: bool = False) -> tuple:
         """Concurrently executes asynchronous callbacks."""
 
         tasks = [asyncio.create_task(callback.coroutine) for callback in callbacks]
@@ -416,7 +416,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            results: list[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=False)
+            results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=False)
         else:
             results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
 
@@ -550,7 +550,7 @@ class Beacon:
             tasks.append(task)
 
         # Bridge to platforms
-        results: list[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=False)
+        results: tuple[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=False)
 
         # Assemble to beacon_message list
         results_final: list[beacon_message.BeaconMessage] = []
