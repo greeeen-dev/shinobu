@@ -20,6 +20,16 @@ import tomllib
 import ujson as json
 from discord.ext import bridge
 
+class ShinobuErrorManager:
+    def __init__(self):
+        self._data: dict = {}
+
+    def add(self, error_id: str, traceback: str, data: dict):
+        if error_id in self._data:
+            return
+
+        self._data.update({error_id: {"traceback": traceback, "data": data}})
+
 class ShinobuSharedObjects:
     def __init__(self):
         self._data: dict = {}
@@ -37,6 +47,7 @@ class ShinobuBot(bridge.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.__shared_objects: ShinobuSharedObjects = ShinobuSharedObjects()
+        self.__errors: ShinobuErrorManager = ShinobuErrorManager()
         self.__cog_entitlements_loader = None
         self._cleanups = {}
         self._should_restart: bool = False
@@ -111,8 +122,12 @@ class ShinobuBot(bridge.Bot):
         return self._should_restart
 
     @property
-    def shared_objects(self):
+    def shared_objects(self) -> ShinobuSharedObjects:
         return self.__shared_objects
+
+    @property
+    def errors(self) -> ShinobuErrorManager:
+        return self.__errors
 
     @property
     def cog_entitlements_loader(self):

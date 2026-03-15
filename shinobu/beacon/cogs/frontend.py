@@ -18,8 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import uuid
 import discord
-from discord.ext import commands
+from discord.ext import commands, bridge
 from shinobu.runtime.models import shinobu_cog
+from shinobu.runtime.utils import check_slash
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.models import (space as beacon_space, driver as beacon_driver, server as beacon_server,
                                    channel as beacon_channel, webhook as beacon_webhook)
@@ -40,46 +41,46 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         # Get Beacon
         self._beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
 
-    @commands.group(name='bridge')
-    async def bridge_text(self, ctx):
+    @bridge.bridge_group(name="bridge")
+    async def bridge_universal(self, ctx):
+        # Universal command group.
         pass
 
-    @bridge_text.command(name="enable-platform")
-    @commands.is_owner()
-    async def enable_platform(self, ctx: commands.Context, platform: str):
-        try:
-            self._beacon.enable_platform(platform)
-        except ValueError:
-            return await ctx.send(f"platform {platform} unavailable or already enabled")
-        await ctx.send(f"enabled platform {platform}")
-
-    @bridge_text.command(name="disable-platform")
-    @commands.is_owner()
-    async def disable_platform(self, ctx: commands.Context, platform: str):
-        try:
-            self._beacon.disable_platform(platform)
-        except ValueError:
-            return await ctx.send(f"platform {platform} unavailable or already disabled")
-        await ctx.send(f"disabled platform {platform}")
-
-    @bridge_text.command(name="new-space")
+    @bridge_universal.command(name="new-space")
     @commands.is_owner() # Owner only for now for debugging purposes
-    async def new_space(self, ctx: commands.Context, *, name: str):
+    async def new_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, *, name: str):
+        """Creates a new Space."""
+
         new_space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
             space_id=str(uuid.uuid4()),
             space_name=name
         )
         self._beacon.spaces.add_space(new_space)
-        await ctx.send(f"space created!\n- id: `{new_space.id}`\n- name: {new_space.name}")
+        await ctx.respond(f"space created!\n- id: `{new_space.id}`\n- name: {new_space.name}")
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
-    @bridge_text.command(name="join-space")
+    @bridge_universal.command(name="delete-space")
+    @commands.is_owner()  # Owner only for now for debugging purposes
+    async def delete_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
+        """Deletes a Space."""
+
+        try:
+            self._beacon.spaces.delete_space(space_id)
+        except KeyError:
+            return await ctx.respond("could not find space :c")
+
+        await ctx.respond(f"space deleted T.T")
+        await self.bot.loop.run_in_executor(None, self._beacon.save_data)
+
+    @bridge_universal.command(name="join-space")
     @commands.is_owner()
-    async def join_space(self, ctx: commands.Context, space_id: str):
+    async def join_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
+        """Joins a Space."""
+
         space: beacon_space.BeaconSpace | None = self._beacon.spaces.get_space(space_id)
 
         if not space:
-            return await ctx.send("could not find space :c")
+            return await ctx.respond("could not find space :c")
 
         discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
@@ -89,7 +90,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
         # Check if we're already in a space
         if self._beacon.spaces.get_space_for_channel(channel_obj):
-            return await ctx.send("already in a space :/")
+            return await ctx.respond("already in a space :/")
 
         webhook: discord.Webhook = await ctx.channel.create_webhook(
             name="Shinobu Bridge"
@@ -108,19 +109,21 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
                 force=True
             )
         except beacon_space.BeaconSpaceAlreadyJoined:
-            return await ctx.send("already in space? :/")
+            return await ctx.respond("already in space? :/")
 
-        await ctx.send("space joined! :3")
+        await ctx.respond("space joined! :3")
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
-    @bridge_text.command(name="leave-space")
+    @bridge_universal.command(name="leave-space")
     @commands.is_owner()
-    async def leave_space(self, ctx: commands.Context, space_id: str):
+    async def leave_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
+        """Leaves a Space."""
+
         # noinspection DuplicatedCode
         space: beacon_space.BeaconSpace | None = self._beacon.spaces.get_space(space_id)
 
         if not space:
-            return await ctx.send("could not find space :c")
+            return await ctx.respond("could not find space :c")
 
         discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
@@ -130,7 +133,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         # Get space membership
         membership: beacon_space.BeaconSpaceMember | None = space.get_member(server_obj)
         if not membership:
-            return await ctx.send("you are not a member of this space :/")
+            return await ctx.respond("you are not a member of this space :/")
 
         # Get webhook
         webhook: discord.Webhook | None = None
@@ -148,9 +151,9 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
             space.leave(membership)
         except beacon_space.BeaconSpaceNotJoined:
             # This should not raise, but let's handle it anyway
-            return await ctx.send("you are not a member of this space :/")
+            return await ctx.respond("you are not a member of this space :/")
 
-        await ctx.send("space left :<")
+        await ctx.respond("space left :<")
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
         # Delete webhook

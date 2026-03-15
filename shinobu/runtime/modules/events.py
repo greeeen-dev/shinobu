@@ -16,7 +16,14 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from discord.ext import commands
+import uuid
+import traceback
+import discord
+from discord.ext import commands, bridge
+from discord.ext.bridge import BridgeExtContext
+from shinobu.runtime.models.colors import Colors
+from shinobu.runtime.utils import check_slash
+
 from shinobu.runtime.models import shinobu_cog
 
 class ShinobuEvents(shinobu_cog.ShinobuCog):
@@ -34,6 +41,36 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
     async def on_ready(self):
         print("Bot is ready, woohoo!")
         print(f"Logged in as {self.bot.user.name}#{self.bot.user.discriminator} ({self.bot.user.id})")
+
+    @commands.Cog.listener()
+    async def on_bridge_command_error(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, error):
+        is_slash: bool = check_slash.is_slash(ctx)
+        traceback_str: str = "".join(traceback.format_exception(error))
+        error_id: str = str(uuid.uuid4())
+
+        # Record error
+        error_data: dict[str, int] = {
+            "server": ctx.guild.id,
+            "channel": ctx.channel.id,
+            "user": ctx.author.id
+        }
+        self.bot.errors.add(error_id, traceback_str, error_data)
+
+        embed: discord.Embed = discord.Embed(
+            title="oh nooooo >.<",
+            description="An error occurred and the command failed to run. Sorry about that... :<",
+            color=Colors.error
+        )
+        embed.add_field(
+            name="Error UUID",
+            value=f"`{error_id}`"
+        )
+        embed.set_footer(text="Send the error UUID to this instance's owner for assistance.")
+
+        if is_slash and not ctx.interaction.response.is_done():
+            await ctx.respond(embed=embed, ephemeral=True)
+        else:
+            await ctx.send(embed=embed)
 
 def setup(bot):
     bot.add_cog(ShinobuEvents(bot))
