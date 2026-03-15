@@ -768,16 +768,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             await message_obj.delete()
 
     async def _purge(self, messages: list[beacon_message.BeaconMessage]):
-        # Get datetime for two weeks ago
-        earliest_datetime: datetime = datetime.now() - timedelta(days=14)
-
-        # Create message ID list
-        message_ids: list[int] = [int(message.id) for message in messages]
-
-        # Purge messages
         channel: discord.TextChannel = self.bot.get_channel(int(messages[0].channel.id))
 
-        def check(message: discord.Message):
-            return message.id in message_ids
-
-        await channel.purge(after=earliest_datetime, check=check)
+        # Delete messages
+        await channel.delete_messages([discord.Object(int(message.id)) for message in messages])

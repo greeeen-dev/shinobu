@@ -309,6 +309,7 @@ class FluxerEvents(cog.Cog):
             return
 
         # Check if author ID exists
+        # This may not be in the data for webhook messages for some reason :/
         if not message.get("author_id"):
             return
 
@@ -334,6 +335,69 @@ class FluxerEvents(cog.Cog):
         # Delete the message!
         try:
             await beacon_obj.delete(message=message_obj)
+        except beacon.BeaconPlatformDisabled:
+            pass
+
+    @cog.Cog.listener()
+    async def on_message_delete_bulk(self, data: dict):
+        server_id: str = data["guild_id"]
+        channel_id: str = data["channel_id"]
+        message_ids: list[int] = [int(message_id) for message_id in data.get("ids", [])]
+
+        # noinspection PyUnresolvedReferences
+        beacon_obj: beacon.Beacon = self.bot.beacon
+
+        # noinspection DuplicatedCode
+        origin_driver: beacon_driver.BeaconDriver = beacon_obj.drivers.get_driver("fluxer")
+
+        to_delete: list[beacon_message.BeaconMessage] = []
+
+        # Get messages
+        for message_id in message_ids:
+            # Get the BeaconMessage object for the message
+            message_obj: beacon_message.BeaconMessage = beacon_obj.messages.get_message(str(message_id))
+            if not message_obj:
+                # We can't remove messages that aren't cached
+                continue
+
+            # Did we bridge this message?
+            # Usually we'd use the native message object as our source-of-truth, but that isn't
+            # possible here, so we'll have to resort to this
+            if message_obj.webhook_id:
+                # Get webhook
+                await origin_driver.getch_webhook(message_obj.webhook_id)
+                webhook: fluxer.Webhook = origin_driver.webhooks.get_webhook(message_obj.webhook_id)
+
+                if webhook.user.id == self.bot.user.id:
+                    # We probably did
+                    continue
+
+            to_delete.append(message_obj)
+
+        if len(to_delete) == 0:
+            # We have nothing to delete
+            return
+
+        # Convert guild data to server.BeaconServer
+        server: beacon_server.BeaconServer = origin_driver.get_server(server_id)
+
+        # Convert channel data to channel.BeaconChannel
+        # noinspection DuplicatedCode
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, channel_id)
+        if not channel:
+            # We can't bridge
+            return
+
+        # Get Space
+        space: beacon_space.BeaconSpace = beacon_obj.spaces.get_space_for_channel(channel)
+
+        if not space:
+            # We can't bridge deletes, even if it was sent in the Space by the server
+            return
+
+        # Delete the messages!
+        try:
+            await beacon_obj.purge(messages=to_delete)
         except beacon.BeaconPlatformDisabled:
             pass
 

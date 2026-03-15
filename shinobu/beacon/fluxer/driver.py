@@ -446,7 +446,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 content=fluxer_content.raw_content,
                 attachments=len(fluxer_content.files),
                 replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
-                webhook_id=webhook_id if webhook_obj else None
+                webhook_id=None
             )
 
         # Send the message!
@@ -486,8 +486,14 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         )
 
     async def _delete(self, message: beacon_message.BeaconMessage):
-        channel = self.bot.get_channel(int(message.channel.id))
+        channel: fluxer.Channel = self.bot.get_channel(int(message.channel.id))
         message_obj = await channel.fetch_message(int(message.id))
 
         # Delete message
         await message_obj.delete()
+
+    async def _purge(self, messages: list[beacon_message.BeaconMessage]):
+        channel: fluxer.Channel = self.bot.get_channel(int(messages[0].channel.id))
+
+        # Delete messages
+        await channel.delete_messages([int(message.id) for message in messages])

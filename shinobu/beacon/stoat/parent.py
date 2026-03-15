@@ -180,6 +180,8 @@ class StoatBot(stoat_commands.Bot):
 
         # Convert channel data to channel.BeaconChannel
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, message.channel.id)
+
+        # noinspection DuplicatedCode
         if not channel:
             # We can't bridge
             return
@@ -229,6 +231,7 @@ class StoatBot(stoat_commands.Bot):
             # We can't do much here
             return
 
+        # noinspection DuplicatedCode
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
 
         # Get the BeaconMessage object for the message
@@ -246,6 +249,7 @@ class StoatBot(stoat_commands.Bot):
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.server.id))
 
         # Convert author data to member.BeaconMember
+        # noinspection DuplicatedCode
         author: beacon_member.BeaconMember = origin_driver.get_member(server, str(message.author.id))
 
         # Convert channel data to channel.BeaconChannel
@@ -293,6 +297,7 @@ class StoatBot(stoat_commands.Bot):
     async def on_message_delete(self, event: stoat.MessageDeleteEvent):
         message: stoat.Message = event.message
 
+        # noinspection DuplicatedCode
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
 
         # Get the BeaconMessage object for the message
@@ -310,6 +315,7 @@ class StoatBot(stoat_commands.Bot):
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.server.id))
 
         # Convert channel data to channel.BeaconChannel
+        # noinspection DuplicatedCode
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
         if not channel:
             # We can't bridge
@@ -325,6 +331,56 @@ class StoatBot(stoat_commands.Bot):
         # Delete the message!
         try:
             await self._beacon.delete(message=message_obj)
+        except beacon.BeaconPlatformDisabled:
+            pass
+
+    async def on_message_delete_bulk(self, event: stoat.MessageDeleteBulkEvent):
+        # noinspection DuplicatedCode
+        origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
+
+        to_delete: list[beacon_message.BeaconMessage] = []
+
+        # Get messages
+        for message in event.messages:
+            # Get the BeaconMessage object for the message
+            message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
+            if not message_obj:
+                # We can't remove messages that aren't cached
+                continue
+
+            # Did we bridge this message?
+            if message.masquerade and message.author_id == self.user.id:
+                # We probably did
+                continue
+
+
+            to_delete.append(message_obj)
+
+        if len(to_delete) == 0:
+            # We have nothing to delete
+            return
+
+        # Convert guild data to server.BeaconServer
+        # We'll use the first message as the reference
+        server: beacon_server.BeaconServer = origin_driver.get_server(event.messages[0].server.id)
+
+        # Convert channel data to channel.BeaconChannel
+        # noinspection DuplicatedCode
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, event.messages[0].channel.id)
+        if not channel:
+            # We can't bridge
+            return
+
+        # Get Space
+        space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
+
+        if not space:
+            # We can't bridge deletes, even if it was sent in the Space by the server
+            return
+
+        # Delete the messages!
+        try:
+            await self._beacon.purge(messages=to_delete)
         except beacon.BeaconPlatformDisabled:
             pass
 

@@ -16,7 +16,6 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import math
 import stoat
 from stoat.ext import commands
 from shinobu.beacon.protocol import messages as beacon_messages
@@ -436,8 +435,11 @@ class StoatDriver(beacon_driver.BeaconDriver):
         )
 
     async def _delete(self, message: beacon_message.BeaconMessage):
-        channel = self.bot.get_channel(message.channel.id)
+        channel: stoat.Channel = self.bot.get_channel(message.channel.id)
         message_obj = await channel.fetch_message(message.id)
 
         # Delete message
         await message_obj.delete()
+
+    async def _purge(self, messages: list[beacon_message.BeaconMessage]):
+        await self.bot.http.delete_messages(messages[0].channel.id, [message.id for message in messages])
