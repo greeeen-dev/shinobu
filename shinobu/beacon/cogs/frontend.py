@@ -20,7 +20,6 @@ import uuid
 import discord
 from discord.ext import commands, bridge
 from shinobu.runtime.models import shinobu_cog
-from shinobu.runtime.utils import check_slash
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.models import (space as beacon_space, driver as beacon_driver, server as beacon_server,
                                    channel as beacon_channel, webhook as beacon_webhook)

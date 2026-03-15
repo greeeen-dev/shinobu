@@ -89,13 +89,13 @@ class StoatBot(stoat_commands.Bot):
                 replies.append(reply_group)
 
                 # Get message content
-                message: stoat.Message = message.channel.get_message(reply)
-                if not message:
+                reply_message: stoat.Message = message.channel.get_message(reply)
+                if not reply_message:
                     # Message isn't cached, we can't do anything
                     continue
 
-                replies_content.update({reply_group.id: self._driver.sanitize_outbound(message.content)})
-                replies_attachments.update({reply_group.id: len(message.attachments)})
+                replies_content.update({reply_group.id: self._driver.sanitize_outbound(reply_message.content)})
+                replies_attachments.update({reply_group.id: len(reply_message.attachments)})
 
         # Get attachments
         tasks = []
