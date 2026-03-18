@@ -751,6 +751,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
     async def _delete(self, message: beacon_message.BeaconMessage):
         channel = self.bot.get_channel(int(message.channel.id))
+        partial_message: discord.PartialMessage = discord.PartialMessage(channel=channel, id=int(message.id))
 
         if message.webhook_id:
             # Ensure webhook is in cache
@@ -760,12 +761,14 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             webhook_obj: discord.Webhook = self._webhooks.get_webhook(message.webhook_id)
 
             # Delete message
-            await webhook_obj.delete_message(message_id=int(message.id))
+            try:
+                await webhook_obj.delete_message(message_id=int(message.id))
+            except RuntimeError:
+                # Use regular delete
+                await partial_message.delete()
         else:
-            message_obj = await channel.fetch_message(int(message.id))
-
             # Delete message
-            await message_obj.delete()
+            await partial_message.delete()
 
     async def _purge(self, messages: list[beacon_message.BeaconMessage]):
         channel: discord.TextChannel = self.bot.get_channel(int(messages[0].channel.id))

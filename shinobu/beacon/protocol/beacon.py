@@ -21,7 +21,7 @@ import uuid
 from enum import Enum
 from discord.ext import bridge
 from shinobu.beacon.protocol import (drivers as beacon_drivers, spaces as beacon_spaces, messages as beacon_messages,
-                                     filters as beacon_filters)
+                                     filters as beacon_filters, pausing as beacon_pausing)
 from shinobu.beacon.models import (space as beacon_space, message as beacon_message, content as beacon_content,
                                    filter as beacon_filter, member as beacon_member, channel as beacon_channel,
                                    driver as beacon_driver, server as beacon_server, user as beacon_user)
@@ -75,6 +75,9 @@ class Beacon:
         # Get data
         self._data: dict = self.__wrapper.read_json("beacon").get("raw", {})
 
+        # Create message ID reservations
+        self._pending: dict = {}
+
         # Initialize managers
         self._drivers: beacon_drivers.BeaconDriverManager = beacon_drivers.BeaconDriverManager(
             self._config.get("enable_platform_whitelist", False),
@@ -83,6 +86,7 @@ class Beacon:
         self._spaces: beacon_spaces.BeaconSpaceManager = beacon_spaces.BeaconSpaceManager()
         self._messages: beacon_messages.BeaconMessageCache = beacon_messages.BeaconMessageCache(self.__wrapper)
         self._filters: beacon_filters.BeaconFilterManager = beacon_filters.BeaconFilterManager()
+        self._pausing: beacon_pausing.BeaconPauseManager = beacon_pausing.BeaconPauseManager()
 
     @property
     def initialized(self) -> bool:
@@ -139,7 +143,7 @@ class Beacon:
 
         results = []
         for callback in callbacks:
-            result = await callback.coroutine()
+            result = await callback.coroutine
             results.append(result)
 
         return results
@@ -247,6 +251,10 @@ class Beacon:
             # Add space
             self.spaces.add_space(space)
 
+        # Load bridge pause data
+        for user_id, user_pause_data in data.get("paused", {}).items():
+            self._pausing.add_pause_from_dict(user_id, user_pause_data)
+
         # Load message cache
         for message_id, message_data in cache.get("messages", {}).items():
             origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message_data.get("origin_platform"))
@@ -313,10 +321,33 @@ class Beacon:
         # Assemble data dict
         data: dict = {
             "spaces": self._spaces.to_dict(),
+            "paused": self._pausing.to_dict(),
             "raw": self._data
         }
 
         self.__wrapper.save_json("beacon", data)
+
+    def _reserve_message(self, message_id: str, group_id: str):
+        self._pending.update({message_id: {"group_id": group_id, "callbacks": []}})
+
+    def is_pending(self, message_id: str):
+        return message_id in self._pending
+
+    def add_callback(self, message_id: str, callback, args: list | None = None, kwargs: dict | None = None):
+        if not self.is_pending(message_id):
+            return
+
+        self._pending[message_id]["callbacks"].append(BeaconCallback(callback, args, kwargs))
+
+    async def _run_pending_actions(self, message_id: str):
+        if not self.is_pending(message_id):
+            return
+
+        # Run pending tasks
+        await self._strategy_sequential(self._pending[message_id]["callbacks"])
+
+        # Remove reservation
+        self._pending.pop(message_id)
 
     async def can_send(self, author: beacon_member.BeaconMember,
                         space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
@@ -324,33 +355,10 @@ class Beacon:
         if not self.initialized:
             raise BeaconNotInit()
 
-        # Get bridge paused data
-        bridge_paused: dict = self._data.get("bridge_paused", {})
-
         # Does the author have their bridge paused?
-        if author.id in bridge_paused:
-            # Get bridge pause data
-            bridge_paused_data: dict = bridge_paused[author.id]
-            bridge_paused_inclusive: bool = bridge_paused_data.get("inclusive")
-            bridge_paused_entries: list = bridge_paused_data.get("entries", [])
-
-            # Check if there's any prefix and suffix matches
-            has_match: bool = False
-            content_text: str = content.to_plaintext()
-            for entry in bridge_paused_entries:
-                if (
-                        content_text.startswith(entry["prefix"]) and
-                        content_text.endswith(entry["suffix"]) and
-                        bridge_paused_inclusive
-                ):
-                    # There's a prefix and suffix match here
-                    return BeaconMessageBlockedReason.bridge_paused
-                elif not bridge_paused_inclusive:
-                    has_match = True
-                    break
-
-            if not has_match and not bridge_paused_inclusive:
-                return BeaconMessageBlockedReason.bridge_paused
+        content_text: str = content.to_plaintext()
+        if not self._pausing.check_can_send(author.id, content_text):
+            return BeaconMessageBlockedReason.bridge_paused
 
         # Run filter scans
         # Filter scans should only be skipped when this is being ran by platform support cogs
@@ -514,6 +522,9 @@ class Beacon:
         if content.original_platform in self._disabled_platforms:
             raise BeaconPlatformDisabled(content.original_platform)
 
+        # Get group ID
+        group_id: str = str(uuid.uuid4())
+
         # Ensure we can send the message
         blocking_condition: BeaconMessageBlockedReason | None = await self.can_send(author, space, content, webhook_id)
 
@@ -549,6 +560,11 @@ class Beacon:
             )
             tasks.append(task)
 
+        # We'll "reserve" the message ID to let the delete methods know that we're waiting for the message
+        # to bridge
+        # This is useful when a message gets deleted before we can handle it
+        self._reserve_message(content.original_id, group_id)
+
         # Bridge to platforms
         results: tuple[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=False)
 
@@ -570,7 +586,7 @@ class Beacon:
 
         # Create message group
         message_group: beacon_message.BeaconMessageGroup = beacon_message.BeaconMessageGroup(
-            group_id=str(uuid.uuid4()),
+            group_id=group_id,
             author=author,
             space_id=space.id,
             messages=results_final,
@@ -582,6 +598,9 @@ class Beacon:
         await self.__bot.loop.run_in_executor(
             None, lambda: self._messages.add_message(message_group, save=True)
         )
+
+        # Run pending actions
+        await self._run_pending_actions(content.original_id)
 
         # Return group
         return message_group

@@ -44,11 +44,11 @@ kdf_available: list = [
 # KDF profiles
 argon2_profiles: dict[str, argon2.Parameters] = {
     "argon2_high": argon2.profiles.RFC_9106_HIGH_MEMORY, # RFC9106 "FIRST RECOMMENDED" parameters, recommended for cold storage
-    "argon2_low": argon2.profiles.RFC_9106_LOW_MEMORY # RFC9106 "SECOND RECOMMENDED" parameters, recommended for everything else (and when argon2_high isn't available)
+    "argon2_low": argon2.profiles.RFC_9106_LOW_MEMORY # RFC9106 "SECOND RECOMMENDED" parameters, default, recommended for everything else (and when argon2_high isn't available)
 }
 pbkdf2_profiles: dict = {
-    "pbkdf2_hmac_sha_256": {"hash": Hash.SHA256, "iterations": 600000}, # Recommended for PBKDF2
-    "pbkdf2_hmac_sha_1": {"hash": Hash.SHA1, "iterations": 1300000}
+    "pbkdf2_hmac_sha_256": {"hash": Hash.SHA256, "iterations": 600000}, # Default, recommended for PBKDF2
+    "pbkdf2_hmac_sha_1": {"hash": Hash.SHA1, "iterations": 1300000} # Compatibility only, not recommended
 }
 kdf_profiles: dict[str, dict] = {
     "argon2": argon2_profiles,

@@ -34,12 +34,12 @@ from shinobu.runtime.models import shinobu_cog
 from shinobu.cli import secrets as secrets_cli, installer as installer_cli
 from shinobu.runtime.secrets.encryptor import EncryptedData
 
-# Manifest path
-manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
-
 # Prevent attacks via import
 if __name__ != "__main__":
     raise RuntimeError("Bootscript should not be imported!")
+
+# Manifest path
+manifest_path = os.path.join(os.path.dirname(__file__), "manifest.json")
 
 # Create argument parser
 parser = argparse.ArgumentParser(

@@ -67,7 +67,7 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
             self.fluxer_bot = self._driver.bot
             return
 
-        # Check if we can register Stoat
+        # Check if we can register Fluxer
         self.can_boot: bool = False
         has_whitelist: bool = self._beacon.config.get("enable_platform_whitelist")
         available_platforms: bool = self._beacon.config.get("enabled_platforms")
@@ -81,9 +81,16 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
             # Create driver
             self._driver = fluxer_driver.FluxerDriver(self.fluxer_bot, self._beacon.messages)
 
+        # Restart status
+        self._restart: bool = False
+
     @property
     def beacon(self) -> beacon.Beacon:
         return self._beacon
+
+    async def restart_bot(self):
+        self._restart = True
+        await self.fluxer_bot.close()
 
     def stop_bot(self):
         """Closes Fluxer bot loop."""
@@ -147,9 +154,14 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                     except GeneratorExit:
                         break
                 else:
-                    # Bot exited gracefully
-                    print("Shutting down Fluxer bot parent.")
-                    break
+                    if not self._restart:
+                        # Bot exited gracefully
+                        print("Shutting down Fluxer bot parent.")
+                        break
+                    else:
+                        self._restart = False
+                        print("Restarting Fluxer bot in 5 seconds.")
+                        await asyncio.sleep(5)
             except:
                 traceback.print_exc()
                 print("Fluxer bot parent task failed, exiting.")
@@ -167,6 +179,16 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
         # Start Fluxer bot
         task: asyncio.Task = self.bot.loop.create_task(self.run_fluxer(token))
         self.bot.shared_objects.add("fluxer_task", task)
+
+    @commands.group(name="fluxer")
+    async def fluxer_text(self, ctx):
+        pass
+
+    @fluxer_text.command()
+    @commands.is_owner()
+    async def restart(self, ctx: commands.Context):
+        await self.restart_bot()
+        await ctx.send("Fluxer bot restarted.")
 
 def get_cog_type():
     return FluxerDriverParent
