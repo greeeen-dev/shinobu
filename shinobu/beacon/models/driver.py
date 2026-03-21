@@ -53,6 +53,9 @@ class BeaconDriverWebhookCache:
     def get_webhook(self, webhook_id: str):
         return self._data.get(webhook_id)
 
+    def clear_webhooks(self):
+        self._data.clear()
+
 class BeaconDriver:
     """A class representing a platform driver for the Beacon bridge protocol."""
 
@@ -176,6 +179,7 @@ class BeaconDriver:
         return self._webhooks
 
     def replace_bot(self, bot):
+        self.webhooks.clear_webhooks()
         self._bot = bot
 
     def get_member(self, server: beacon_server.BeaconServer, member_id: str) -> beacon_member.BeaconMember | None:
