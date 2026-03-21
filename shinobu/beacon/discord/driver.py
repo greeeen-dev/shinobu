@@ -669,17 +669,15 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 return None
 
             # noinspection PyTypeChecker
-            async with aiohttp.ClientSession(json_serialize=orjson.dumps) as session:
-                webhook_obj.session = session
-                message = await webhook_obj.send(
-                    content=discord_content.content,
-                    view=discord_content.components,
-                    embeds=discord_content.embeds,
-                    files=discord_content.files,
-                    username=custom_name,
-                    avatar_url=custom_avatar,
-                    wait=True
-                )
+            message = await webhook_obj.send(
+                content=discord_content.content,
+                view=discord_content.components,
+                embeds=discord_content.embeds,
+                files=discord_content.files,
+                username=custom_name,
+                avatar_url=custom_avatar,
+                wait=True
+            )
         else:
             if not target:
                 return None
