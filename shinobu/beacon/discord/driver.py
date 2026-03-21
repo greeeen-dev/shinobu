@@ -19,9 +19,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import io
 import uuid
 import discord
-import orjson
-import aiohttp
-from datetime import datetime, timedelta
+from datetime import datetime
 from discord.ext import bridge
 from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
