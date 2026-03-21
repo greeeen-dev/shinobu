@@ -376,7 +376,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         webhook = await self.bot.fetch_webhook(int(webhook_id))
 
         # Store webhook to cache
-        self._webhooks.store_webhook(str(webhook.id), webhook)
+        self._webhooks.store_webhook(str(webhook.id), webhook, ttl=3600)
 
         return self._to_beacon_webhook(webhook)
 

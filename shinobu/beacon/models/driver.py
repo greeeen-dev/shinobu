@@ -16,6 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import time
 from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (user as beacon_user, channel as beacon_channel, server as beacon_server,
                                    member as beacon_member, webhook as beacon_webhook, message as beacon_message,
@@ -39,22 +40,35 @@ class BeaconDriverWebhookCache:
 
     def __init__(self):
         self._data: dict = {}
+        self._data_ttl: dict[str, int] = {}
 
-    def store_webhook(self, webhook_id: str, webhook):
+    def store_webhook(self, webhook_id: str, webhook, ttl: int | None = None):
         if webhook.id in self._data:
             raise KeyError("Webhook already in cache")
 
         self._data.update({webhook_id: webhook})
 
-    def store_webhooks(self, webhooks: dict):
+        if ttl:
+            self._data_ttl.update({webhook_id: round(time.time()) + ttl})
+
+    def store_webhooks(self, webhooks: dict, ttl: dict[str, int]):
         for webhook in webhooks:
-            self.store_webhook(webhook, webhooks[webhook])
+            self.store_webhook(webhook, webhooks[webhook], ttl=ttl.get(webhook))
 
     def get_webhook(self, webhook_id: str):
+        if self._data.get(webhook_id):
+            ttl: int | None = self._data_ttl.get(webhook_id)
+            if ttl and time.time() > ttl:
+                # Webhook expired
+                self._data.pop(webhook_id)
+                self._data_ttl.pop(webhook_id)
+                return None
+
         return self._data.get(webhook_id)
 
     def clear_webhooks(self):
         self._data.clear()
+        self._data_ttl.clear()
 
 class BeaconDriver:
     """A class representing a platform driver for the Beacon bridge protocol."""
