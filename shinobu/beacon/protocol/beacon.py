@@ -78,6 +78,9 @@ class Beacon:
         # Create message ID reservations
         self._pending: dict = {}
 
+        # Create platforms that may need webhook cache wipe
+        self._webhook_cache_wipe: list[str] = []
+
         # Initialize managers
         self._drivers: beacon_drivers.BeaconDriverManager = beacon_drivers.BeaconDriverManager(
             self._config.get("enable_platform_whitelist", False),
@@ -138,17 +141,27 @@ class Beacon:
         self._disabled_platforms.append(platform)
 
     @staticmethod
-    async def _strategy_sequential(callbacks: list[BeaconCallback]) -> list:
+    def _has_timeout(results: tuple | list):
+        for result in results:
+            if type(result) is asyncio.TimeoutError:
+                return True
+
+        return False
+
+    @staticmethod
+    async def _strategy_sequential(callbacks: list[BeaconCallback | Exception]) -> list:
         """Sequentially executes asynchronous callbacks."""
 
         results = []
         for callback in callbacks:
-            result = await callback.coroutine
+            async with asyncio.timeout(15):
+                result = await callback.coroutine
+
             results.append(result)
 
         return results
 
-    async def _strategy_async(self, callbacks: list[BeaconCallback], return_exceptions: bool = False) -> tuple:
+    async def _strategy_async(self, callbacks: list[BeaconCallback | Exception], return_exceptions: bool = False) -> tuple:
         """Concurrently executes asynchronous callbacks."""
 
         tasks = [asyncio.create_task(callback.coroutine) for callback in callbacks]
@@ -156,7 +169,8 @@ class Beacon:
         # Add task to tasks list
         self._bridge_tasks.update({str(uuid.uuid4()): [tasks]})
 
-        return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
+        async with asyncio.timeout(15 * len(callbacks)):
+            return await asyncio.gather(*tasks, return_exceptions=return_exceptions)
 
     def cancel_pending_tasks(self):
         for task_entry in self._bridge_tasks:
@@ -423,10 +437,15 @@ class Beacon:
             )
             tasks.append(task)
 
-        if driver.supports_async:
-            results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=False)
-        else:
-            results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
+        try:
+            if driver.supports_async:
+                results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=False)
+            else:
+                results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
+        except asyncio.TimeoutError:
+            if driver.platform not in self._webhook_cache_wipe:
+                self._webhook_cache_wipe.append(driver.platform)
+            raise
 
         # Filter out exceptions
         for result in results:
@@ -566,7 +585,13 @@ class Beacon:
         self._reserve_message(content.original_id, group_id)
 
         # Bridge to platforms
-        results: tuple[list[beacon_message.BeaconMessage]] = await self._strategy_async(tasks, return_exceptions=False)
+        results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(tasks, return_exceptions=True)
+        if self._has_timeout(results):
+            # Wipe webhook cache
+            for should_wipe in self._webhook_cache_wipe:
+                driver: beacon_driver.BeaconDriver = self._drivers.get_driver(should_wipe)
+                driver.webhooks.clear_webhooks()
+                self._webhook_cache_wipe.remove(should_wipe)
 
         # Assemble to beacon_message list
         results_final: list[beacon_message.BeaconMessage] = []
