@@ -353,6 +353,9 @@ class Beacon:
 
         self._pending[message_id]["callbacks"].append(BeaconCallback(callback, args, kwargs))
 
+    def _cancel_pending_actions(self, message_id: str):
+        self._pending.pop(message_id, None)
+
     async def _run_pending_actions(self, message_id: str):
         if not self.is_pending(message_id):
             return
@@ -585,7 +588,13 @@ class Beacon:
         self._reserve_message(content.original_id, group_id)
 
         # Bridge to platforms
-        results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(tasks, return_exceptions=True)
+        try:
+            results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(tasks, return_exceptions=True)
+        except:
+            # Cancel pending actions
+            self._cancel_pending_actions(content.original_id)
+            raise
+
         if self._has_timeout(results):
             # Wipe webhook cache
             for should_wipe in self._webhook_cache_wipe:
