@@ -93,19 +93,23 @@ class BeaconMessageCache:
         # So if any errors arise, it may be acceptable to ignore them and lose the cached message
         # or message group causing the errors.
 
+        # Copy data
+        data: dict = self._data.copy()
+        data_groups: dict = self._data_groups.copy()
+
         # Convert data to dictionary
         converted = {}
-        for message in self._data:
+        for message in data:
             try:
-                converted.update({message: self._data[message].to_dict()})
+                converted.update({message: data[message].to_dict()})
             except AttributeError:
                 # Assume something is just set to None
                 continue
 
         converted_groups = {}
-        for group in self._data_groups:
+        for group in data_groups:
             try:
-                converted_groups.update({group: self._data_groups[group].to_dict()})
+                converted_groups.update({group: data_groups[group].to_dict()})
             except AttributeError:
                 # Assume something is just set to None
                 continue
