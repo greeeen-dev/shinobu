@@ -22,6 +22,7 @@ import textwrap
 import time
 import traceback
 import base64
+import discord
 from contextlib import redirect_stdout
 from discord.ext import commands
 from shinobu.runtime.models import shinobu_cog
@@ -120,6 +121,23 @@ class Admin(shinobu_cog.ShinobuCog):
                 await ctx.send(f':white_check_mark: Evaluation completed in `{exec_time}` seconds.')
             else:
                 await ctx.send(f':white_check_mark: Evaluation completed in `{exec_time}` seconds.\n```\n{value}\n```')
+
+    @commands.command(name="shutdown", description="Shuts the bot down.", aliases=["poweroff"])
+    @commands.is_owner()
+    async def shutdown(self, ctx: commands.Context):
+        await ctx.reply("shutting down :zzz:")
+
+        # Shut down bot
+        await self.bot.close()
+
+    @commands.command(name="restart", description="Restarts the bot.", aliases=["reboot"])
+    @commands.is_owner()
+    async def restart(self, ctx: commands.Context):
+        message: discord.Message = await ctx.reply("restarting :arrows_counterclockwise:")
+
+        # Request restart then shut down bot
+        self.bot.request_restart(message=message)
+        await self.bot.close()
 
 def setup(bot):
     bot.add_cog(Admin(bot))

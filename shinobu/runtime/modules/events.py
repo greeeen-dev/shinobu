@@ -20,7 +20,6 @@ import uuid
 import traceback
 import discord
 from discord.ext import commands, bridge
-from discord.ext.bridge import BridgeExtContext
 from shinobu.runtime.models.colors import Colors
 from shinobu.runtime.utils import check_slash
 
@@ -39,8 +38,17 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
 
     @commands.Cog.listener()
     async def on_ready(self):
-        print("Bot is ready, woohoo!")
+        print("Shinobu Runtime is ready! :3")
         print(f"Logged in as {self.bot.user.name}#{self.bot.user.discriminator} ({self.bot.user.id})")
+
+        # Handle restart
+        if self.bot.restart_message_id:
+            channel: discord.TextChannel | None = self.bot.get_channel(self.bot.restart_message_channel_id)
+            if not channel:
+                return
+
+            message: discord.PartialMessage = discord.PartialMessage(channel=channel, id=self.bot.restart_message_id)
+            await message.edit(content="bot restarted! :white_check_mark:")
 
     @commands.Cog.listener()
     async def on_bridge_command_error(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, error):

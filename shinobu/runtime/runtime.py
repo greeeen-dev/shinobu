@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import tomllib
 import ujson as json
+import discord
 from discord.ext import bridge
 
 class ShinobuErrorManager:
@@ -50,7 +51,12 @@ class ShinobuBot(bridge.Bot):
         self.__errors: ShinobuErrorManager = ShinobuErrorManager()
         self.__cog_entitlements_loader = None
         self._cleanups = {}
-        self._should_restart: bool = False
+
+        # Restart state
+        self._should_restart: bool = False # Restart on crash
+        self._requested_restart: bool = False # Instance owner requested restart
+        self.restart_message_id: int | None = None
+        self.restart_message_channel_id: int | None = None
 
         # Load configs
         self._config: dict = {}
@@ -122,6 +128,10 @@ class ShinobuBot(bridge.Bot):
         return self._should_restart
 
     @property
+    def requested_restart(self) -> bool:
+        return self._requested_restart
+
+    @property
     def shared_objects(self) -> ShinobuSharedObjects:
         return self.__shared_objects
 
@@ -132,3 +142,11 @@ class ShinobuBot(bridge.Bot):
     @property
     def cog_entitlements_loader(self):
         return self.__cog_entitlements_loader
+
+    def request_restart(self, message: discord.Message | None = None):
+        """Sets bot to restart. This does not restart the bot on its own."""
+        self._requested_restart = True
+
+        if message:
+            self.restart_message_id = message.id
+            self.restart_message_channel_id = message.channel.id

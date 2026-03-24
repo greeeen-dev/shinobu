@@ -21,10 +21,12 @@ import sys
 import time
 import copy
 import argparse
+import traceback
 import ujson as json
 import orjson
 import getpass
 import uuid
+import asyncio
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -53,6 +55,10 @@ launch_args = parser.parse_args()
 # Get launch options
 launch_secrets_cli: bool = launch_args.secrets
 launch_installer_cli: bool = launch_args.installer
+
+# Store restart options
+restart_message_id: int | None = None
+restart_message_channel_id: int | None = None
 
 # Create TokenStore variable (do not initialize yet)
 tokenstore: manager.TokenStore | None = None
@@ -557,7 +563,11 @@ class ModuleLoader:
 def start_bot() -> bool:
     """Starts Shinobu!"""
 
-    global tokenstore, secrets_authority, raw_encryptor, extension_map, password
+    global tokenstore, secrets_authority, raw_encryptor, extension_map, password, restart_message_id,\
+           restart_message_channel_id
+
+    # Ensure asyncio event loop is always fresh
+    asyncio.set_event_loop(asyncio.new_event_loop())
 
     # Regenerate bootscript-level objects
     tokenstore = manager.TokenStore(
@@ -582,6 +592,8 @@ def start_bot() -> bool:
 
     # Create Shinobu bot instance
     bot: runtime.ShinobuBot = runtime.ShinobuBot(command_prefix="sh!", intents=intents, manifest=manifest_path)
+    bot.restart_message_id = restart_message_id
+    bot.restart_message_channel_id = restart_message_channel_id
     bot.setup_entitlements_loader(ModuleLoader(bot))
     bot.load_builtins()
 
@@ -593,11 +605,26 @@ def start_bot() -> bool:
         bot.run(tokenstore.retrieve("TOKEN"))
     except KeyboardInterrupt:
         pass
+    except RuntimeError:
+        # Assume session was closed (i.e. bot restarted)
+        pass
     except:
+        traceback.print_exc()
         print("Bot has crashed.")
         should_restart = bot.should_restart
 
+    # Run cleanup
     bot.cleanup()
+
+    # Set restart state and channel
+    if bot.requested_restart:
+        should_restart = True
+        restart_message_id = bot.restart_message_id
+        restart_message_channel_id = bot.restart_message_channel_id
+
+    # Clear bot memory
+    del bot
+
     return should_restart
 
 def start_secrets_cli():
