@@ -234,6 +234,9 @@ class BeaconDriver:
         if message.platform != self.platform:
             raise BeaconDriverPlatformMismatch(message.platform)
 
+        # Update message content
+        message.edit_content(content.to_plaintext())
+
         return await self._edit(message, content, compatibility=compatibility)
 
     async def delete(self, message: beacon_message.BeaconMessage):

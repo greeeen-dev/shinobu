@@ -133,6 +133,9 @@ class Admin(shinobu_cog.ShinobuCog):
     @commands.command(name="restart", description="Restarts the bot.", aliases=["reboot"])
     @commands.is_owner()
     async def restart(self, ctx: commands.Context):
+        # NOTE: This does NOT update Runtime or Beacon.
+        # To update them, fully shut down the bot then start it again.
+
         message: discord.Message = await ctx.reply("restarting :arrows_counterclockwise:")
 
         # Request restart then shut down bot

@@ -442,7 +442,7 @@ class Beacon:
 
         try:
             if driver.supports_async:
-                results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=False)
+                results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=True)
             else:
                 results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
         except asyncio.TimeoutError:
@@ -479,7 +479,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=False)
+            await self._strategy_async(tasks, return_exceptions=True)
         else:
             await self._strategy_sequential(tasks)
 
@@ -500,7 +500,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=False)
+            await self._strategy_async(tasks, return_exceptions=True)
         else:
             await self._strategy_sequential(tasks)
 
@@ -529,7 +529,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=False)
+            await self._strategy_async(tasks, return_exceptions=True)
         else:
             await self._strategy_sequential(tasks)
 
