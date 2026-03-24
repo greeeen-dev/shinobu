@@ -82,7 +82,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             if embed.footer:
                 embed_block.set_footer(
                     text=embed.footer.text,
-                    icon_url=embed.author.icon_url
+                    icon_url=embed.footer.icon_url
                 )
 
             if embed.timestamp:
