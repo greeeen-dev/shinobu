@@ -1,7 +1,7 @@
 import asyncio
 import discord
 from typing import Any
-from discord.ext import bridge
+from discord.ext import bridge, commands
 
 class ShinobuListNotImplemented(Exception):
     pass
@@ -20,13 +20,20 @@ class ShinobuListEntryField:
         return self._value
 
 class ShinobuListEntry:
-    def __init__(self, name: str, description: str | None = None, emoji: str | None = None):
+    def __init__(self, entry_id: str, name: str, description: str | None = None, emoji: str | None = None,
+                 hidden: bool = False):
+        self._id: str = entry_id
         self._name: str = name
         self._description: str | None = description
         self._emoji: str | None = emoji
+        self._hidden: bool = hidden
         self._fields: list[ShinobuListEntryField] = []
         self._parent: ShinobuListEntry | None = None
         self._children: list[ShinobuListEntry] = []
+
+    @property
+    def id(self) -> str:
+        return self._id
 
     @property
     def name(self) -> str:
@@ -39,6 +46,10 @@ class ShinobuListEntry:
     @property
     def emoji(self) -> str | None:
         return self._emoji
+
+    @property
+    def hidden(self) -> bool:
+        return self._hidden
 
     @property
     def fields(self) -> list[ShinobuListEntryField]:
@@ -86,10 +97,12 @@ class ShinobuListContent:
 class ShinobuListBaseView:
     """A base class for list views."""
 
-    def __init__(self, title: str, description: str, color: int):
+    def __init__(self, title: str, description: str, color: int, allow_hidden: bool = False):
         self._title: str = title
         self._description: str = description
         self._color: int = color
+        self._allow_hidden: bool = allow_hidden
+        self._show_hidden: bool = False
         self._entries: list[ShinobuListEntry] = []
         self._page: int = 0
         self._viewing: ShinobuListEntry | None = None
@@ -110,10 +123,11 @@ class ShinobuListBaseView:
 
     @property
     def current_entries(self) -> list[ShinobuListEntry]:
+        all_entries: list[ShinobuListEntry] = self._entries
         if self._viewing:
-            return self._viewing.children
-        else:
-            return self._entries
+            all_entries = self._viewing.children
+
+        return [entry for entry in all_entries if (not entry.hidden or self._show_hidden)]
 
     @property
     def max_page(self) -> int:
@@ -143,6 +157,25 @@ class ShinobuListBaseView:
 
         return results
 
+    def toggle_hidden(self):
+        if not self._allow_hidden:
+            return
+
+        self._show_hidden = not self._show_hidden
+
+    def add_entry(self, entry: ShinobuListEntry):
+        if self.get_entry(entry.id):
+            raise ValueError("Entry already added")
+
+        self._entries.append(entry)
+
+    def get_entry(self, entry_id: str) -> ShinobuListEntry | None:
+        for entry in self._entries:
+            if entry_id == entry.id:
+                return entry
+
+        return None
+
     def search(self, query: str, by_title: bool = True, by_desc: bool = True, use_both: bool = False):
         if use_both:
             by_title = True
@@ -153,7 +186,12 @@ class ShinobuListBaseView:
         self._by_desc = by_desc
         self._use_both = use_both
 
-    def select(self, entry: ShinobuListEntry):
+    def select(self, entry: ShinobuListEntry | str):
+        if type(entry) is str:
+            entry = self.get_entry(entry)
+            if not entry:
+                raise ValueError("Invalid entry")
+
         if entry not in self._entries:
             self._viewing = None
         else:
@@ -222,10 +260,9 @@ class ShinobuListDiscordView(ShinobuListBaseView):
         if not self.is_head:
             # Get items
             options: list[discord.SelectOption] = []
-            for index in range(len(self.visible_current_entries)):
-                entry: ShinobuListEntry = self.visible_current_entries[index]
+            for entry in self.visible_current_entries:
                 options.append(discord.SelectOption(
-                    label=entry.name, value=str(index), emoji=entry.emoji
+                    label=entry.name, value=entry.id, emoji=entry.emoji
                 ))
 
             view.add_item(discord.ui.ActionRow(
@@ -305,24 +342,65 @@ class ShinobuListDiscordView(ShinobuListBaseView):
                 )
             ))
 
+        # Add hidden items toggle
+        if self._allow_hidden:
+            view.add_item(discord.ui.ActionRow(
+                discord.ui.Button(
+                    label="Hide hidden items" if self._show_hidden else "Show hidden items",
+                    style=discord.ButtonStyle.gray,
+                    custom_id="navigation_hidden"
+                )
+            ))
+
         return view
+
+    @staticmethod
+    def _build_search() -> discord.ui.DesignerModal:
+        modal: discord.ui.DesignerModal = discord.ui.DesignerModal(
+            title="Search",
+            custom_id="search_modal",
+            store=False
+        )
+        modal.add_item(
+            discord.ui.InputText(
+                label="Search query",
+                placeholder="Search anything...",
+                style=discord.InputTextStyle.short,
+                custom_id="search_query",
+                required=True
+            )
+        )
+
+        return modal
 
     def render(self) -> ShinobuListContent:
         embed: discord.Embed = self._build_embed()
         view: discord.ui.View = self._build_view()
         return ShinobuListContent(embed=embed, view=view)
 
-    async def run(self, bot: bridge.Bot, initiator: discord.Interaction):
+    async def run(self, bot: bridge.Bot, initiator: discord.Interaction | commands.Context):
         content: ShinobuListContent = self.render()
-        message: discord.Message = (await initiator.response().send_message(
-            content=content.text,
-            embed=content.embed,
-            view=content.view
-        )).message
+
+        if isinstance(initiator, discord.Interaction):
+            # Slash command
+            initiator_user: discord.User = initiator.user
+            message: discord.Message = (await initiator.response().send_message(
+                content=content.text,
+                embed=content.embed,
+                view=content.view
+            )).message
+        else:
+            # Text command
+            initiator_user: discord.User = initiator.author
+            message: discord.Message = await initiator.send(
+                content=content.text,
+                embed=content.embed,
+                view=content.view
+            )
 
         # Wait for interactions
         def check(incoming: discord.Interaction):
-            return incoming.user.id == initiator.user.id and incoming.channel_id == initiator.channel_id
+            return incoming.user.id == initiator_user.id and incoming.channel_id == initiator.channel_id
 
         while True:
             try:
@@ -332,3 +410,64 @@ class ShinobuListDiscordView(ShinobuListBaseView):
                 # Stop loop
                 await message.edit(view=None)
                 break
+
+            # Get interaction response object
+            response: discord.InteractionResponse = interaction.response()
+
+            if interaction.custom_id == "navigation_select":
+                # Select item
+                selected: str = interaction.data["values"][0]
+                self.select(selected)
+            elif interaction.custom_id == "navigation_back":
+                # Go back
+                self.back()
+            elif interaction.custom_id == "navigation_first":
+                # Show first page
+                self._page = 0
+            elif interaction.custom_id == "navigation_previous":
+                # Show previous page
+                self._page -= 1 if self._page > 0 else 0
+            elif interaction.custom_id == "navigation_next":
+                # Show next page
+                self._page += 1 if self._page < self.max_page else 0
+            elif interaction.custom_id == "navigation_last":
+                # Show last page
+                self._page = self.max_page
+            elif interaction.custom_id == "navigation_search":
+                # Launch search
+                modal: discord.ui.DesignerModal = self._build_search()
+                await response.send_modal(modal)
+            elif interaction.custom_id == "navigation_hidden":
+                # Toggle hidden items
+                self.toggle_hidden()
+            elif interaction.custom_id == "search_modal":
+                # Search submit
+                query: str = interaction.data["components"][0].get("value", None)
+                self.search(query)
+            elif interaction.custom_id == "search_name":
+                # Search by title
+                self._by_title = not self._by_title
+            elif interaction.custom_id == "search_desc":
+                # Search by description
+                self._by_desc = not self._by_desc
+            elif interaction.custom_id == "search_both":
+                # Search by title or/and description (toggle)
+                self._use_both = not self._use_both
+
+                if self._use_both:
+                    self._by_title = True
+                    self._by_desc = True
+
+            # Display new content
+            new_content: ShinobuListContent = self.render()
+
+            if not response.is_done():
+                await response.edit_message(
+                    embed=new_content.embed,
+                    view=new_content.view
+                )
+            else:
+                await interaction.edit_original_response(
+                    embed=new_content.embed,
+                    view=new_content.view
+                )

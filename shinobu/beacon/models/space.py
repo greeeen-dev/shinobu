@@ -193,8 +193,9 @@ class BeaconSpace:
     def __init__(self, space_id: str, space_name: str, space_emoji: str | None = None, members: list | None = None,
                  partial_members: list| None = None, invites: list | None = None, bans: list | None = None,
                  private: bool = False, nsfw: bool = False, private_owner_id: str | None = None,
-                 relay_deletes: bool = True, relay_edits: bool = True, relay_large_attachments: bool = True,
-                 compatibility: bool = False, filters: list | None = None, filter_configs: dict | None = None):
+                 private_owner_platform: str | None = None, relay_deletes: bool = True, relay_edits: bool = True,
+                 relay_large_attachments: bool = True, compatibility: bool = False, filters: list | None = None,
+                 filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
         self._emoji: str = space_emoji
@@ -205,7 +206,8 @@ class BeaconSpace:
 
         # Room options
         self._private: bool = private
-        self._private_owner_id: str = private_owner_id
+        self._private_owner_id: str | None = private_owner_id
+        self._private_owner_platform: str | None = private_owner_platform
         self._nsfw: bool = nsfw
         self._deletes: bool = relay_deletes
         self._edits: bool = relay_edits
@@ -245,6 +247,14 @@ class BeaconSpace:
     @property
     def private(self) -> bool:
         return self._private
+
+    @property
+    def private_owner_id(self) -> str | None:
+        return self._private_owner_id if self._private else None
+
+    @property
+    def private_owner_platform(self) -> str | None:
+        return self._private_owner_platform if self._private else None
 
     @property
     def nsfw(self) -> bool:
@@ -388,6 +398,15 @@ class BeaconSpace:
 
         return None
 
+    def has_access(self, server: beacon_server.BeaconServer) -> bool:
+        # Check for membership
+        has_membership: bool = self.get_member(server) is not None
+
+        # Check for ownership
+        has_ownership: bool = server.id == self.private_owner_id
+
+        return has_membership or has_ownership
+
     def to_dict(self) -> dict:
         data = {
             "id": self.id,
@@ -398,6 +417,8 @@ class BeaconSpace:
             "bans": self.bans.copy(),
             "options": {
                 "private": self.private,
+                "private_owner_id": self._private_owner_id,
+                "private_owner_platform": self._private_owner_platform,
                 "nsfw": self.nsfw,
                 "relay_deletes": self.relay_deletes,
                 "relay_edits": self.relay_edits,

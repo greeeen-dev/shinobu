@@ -71,6 +71,7 @@ class Beacon:
         self._disabled_platforms: list[str] = []
         self._init: bool = False
         self._bridge_tasks: dict[str, list] = {}
+        self._debug: bool = False
 
         # Get data
         self._data: dict = self.__wrapper.read_json("beacon").get("raw", {})
@@ -119,10 +120,20 @@ class Beacon:
     def pending_bridge_tasks(self) -> int:
         return len(self._bridge_tasks)
 
+    @property
+    def debug(self) -> bool:
+        return self._debug
+
     @staticmethod
     def bacon():
         """Bacon because I keep confusing beacon and bacon"""
         print("Bacon 🥓")
+
+    def enable_debug(self):
+        self._debug = True
+
+    def disable_debug(self):
+        self._debug = False
 
     def enable_platform(self, platform: str):
         if platform not in self._drivers.platforms:
@@ -207,6 +218,7 @@ class Beacon:
                 space_emoji=space_data.get("emoji"),
                 private=space_data.get("options", {}).get("private"),
                 private_owner_id=space_data.get("options", {}).get("private_owner_id"),
+                private_owner_platform=space_data.get("options", {}).get("private_owner_platform"),
                 nsfw=space_data.get("options", {}).get("nsfw"),
                 relay_deletes=space_data.get("options", {}).get("relay_deletes"),
                 relay_edits=space_data.get("options", {}).get("relay_edits"),
@@ -442,7 +454,7 @@ class Beacon:
 
         try:
             if driver.supports_async:
-                results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=True)
+                results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=self.debug)
             else:
                 results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
         except asyncio.TimeoutError:
@@ -479,7 +491,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=True)
+            await self._strategy_async(tasks, return_exceptions=self.debug)
         else:
             await self._strategy_sequential(tasks)
 
@@ -500,7 +512,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=True)
+            await self._strategy_async(tasks, return_exceptions=self.debug)
         else:
             await self._strategy_sequential(tasks)
 
@@ -529,7 +541,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=True)
+            await self._strategy_async(tasks, return_exceptions=self.debug)
         else:
             await self._strategy_sequential(tasks)
 
@@ -589,7 +601,7 @@ class Beacon:
 
         # Bridge to platforms
         try:
-            results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(tasks, return_exceptions=True)
+            results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(tasks, return_exceptions=self.debug)
         except:
             # Cancel pending actions
             self._cancel_pending_actions(content.original_id)
@@ -698,7 +710,7 @@ class Beacon:
             tasks.append(task)
 
         # Bridge to platforms
-        await self._strategy_async(tasks, return_exceptions=False)
+        await self._strategy_async(tasks, return_exceptions=self.debug)
 
     async def delete(self, message: beacon_message.BeaconMessage):
         """Deletes a message sent to a Space."""
@@ -729,7 +741,7 @@ class Beacon:
             tasks.append(task)
 
         # Bridge to platforms
-        await self._strategy_async(tasks, return_exceptions=False)
+        await self._strategy_async(tasks, return_exceptions=self.debug)
 
         # Remove message group from cache
         # noinspection PyTypeChecker
@@ -768,7 +780,7 @@ class Beacon:
             tasks.append(task)
 
         # Bridge to platforms
-        await self._strategy_async(tasks, return_exceptions=False)
+        await self._strategy_async(tasks, return_exceptions=self.debug)
 
         # Remove message groups from cache
         for message_group in message_groups:

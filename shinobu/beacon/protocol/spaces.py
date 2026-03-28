@@ -38,6 +38,10 @@ class BeaconSpaceManager:
     def allow_private_spaces(self) -> bool:
         return self._allow_private_spaces
 
+    @property
+    def all_spaces(self) -> list[beacon_space.BeaconSpace]:
+        return list(self._spaces.values())
+
     def add_space(self, space: beacon_space.BeaconSpace, creating: bool = False):
         """Adds a Space to Beacon."""
 

@@ -730,7 +730,11 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 allowed_mentions=discord.AllowedMentions.none()
             )
         else:
-            message_obj: discord.Message = await channel.fetch_message(int(message.id))
+            try:
+                message_obj: discord.Message = await channel.fetch_message(int(message.id))
+            except discord.NotFound:
+                # Message doesn't exist
+                return
 
             if message_obj.author.id != self.bot.user.id:
                 # We can't edit messages we didn't write
