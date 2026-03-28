@@ -556,6 +556,10 @@ class Beacon:
         if content.original_platform in self._disabled_platforms:
             raise BeaconPlatformDisabled(content.original_platform)
 
+        # Ensure content is not empty
+        if len(content.blocks) == 0 and len(content.files) == 0:
+            return
+
         # Get group ID
         group_id: str = str(uuid.uuid4())
 
