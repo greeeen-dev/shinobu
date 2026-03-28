@@ -378,7 +378,7 @@ class Beacon:
         # Remove reservation
         self._pending.pop(message_id)
 
-    async def can_send(self, author: beacon_member.BeaconMember,
+    async def can_send(self, author: beacon_member.BeaconMember | beacon_member.BeaconPartialMember,
                         space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
                         webhook_id: str | None = None, skip_filter: bool = False) -> BeaconMessageBlockedReason | None:
         if not self.initialized:
@@ -545,9 +545,9 @@ class Beacon:
         else:
             await self._strategy_sequential(tasks)
 
-    async def send(self, author: beacon_member.BeaconMember, space: beacon_space.BeaconSpace,
-                   content: beacon_message.BeaconMessageContent, webhook_id: str | None = None
-                   ) -> beacon_message.BeaconMessageGroup | None:
+    async def send(self, author: beacon_member.BeaconMember | beacon_member.BeaconPartialMember,
+                   space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
+                   webhook_id: str | None = None) -> beacon_message.BeaconMessageGroup | None:
         """Sends a message to a Space."""
 
         if not self.initialized:

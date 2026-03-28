@@ -329,7 +329,20 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild.id))
 
         # Convert author data to member.BeaconMember
-        author: beacon_member.BeaconMember = origin_driver.get_member(server, str(message.author.id))
+        author: beacon_member.BeaconMember | beacon_member.BeaconPartialMember | None = origin_driver.get_member(
+            server, str(message.author.id)
+        )
+
+        if not author:
+            # We probably could not get the author, so we create a partial member instead
+            author = beacon_member.BeaconPartialMember(
+                user_id=str(message.author.id),
+                platform="discord",
+                name=message.author.name,
+                server=server,
+                display_name=message.author.global_name,
+                avatar_url=message.author.avatar.url if message.author.avatar else None
+            )
 
         # Convert channel data to channel.BeaconChannel
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
