@@ -54,7 +54,7 @@ class BeaconManager(shinobu_cog.ShinobuCog):
             self._beacon.enable_platform(platform)
         except ValueError:
             return await ctx.send(f"platform {platform} unavailable or already enabled")
-        await ctx.send(f"enabled platform {platform}")
+        await ctx.send(f":white_check_mark: enabled platform {platform}")
 
     @beacon_text.command(name="disable-platform")
     @commands.is_owner()
@@ -65,7 +65,27 @@ class BeaconManager(shinobu_cog.ShinobuCog):
             self._beacon.disable_platform(platform)
         except ValueError:
             return await ctx.send(f"platform {platform} unavailable or already disabled")
-        await ctx.send(f"disabled platform {platform}")
+        await ctx.send(f":white_check_mark: disabled platform {platform}")
+
+    @beacon_text.command(name="enable-debug")
+    @commands.is_owner()
+    async def enable_debug(self, ctx: commands.Context):
+        """Enables debug mode."""
+
+        if self._beacon.debug:
+            return await ctx.send("debug mode already on")
+        self._beacon.enable_debug()
+        await ctx.send(f":white_check_mark: debug mode on")
+
+    @beacon_text.command(name="disable-debug")
+    @commands.is_owner()
+    async def disable_debug(self, ctx: commands.Context):
+        """Disables debug mode."""
+
+        if not self._beacon.debug:
+            return await ctx.send("debug mode already off")
+        self._beacon.disable_debug()
+        await ctx.send(f":white_check_mark: debug mode off")
 
 def get_cog_type():
     return BeaconManager
