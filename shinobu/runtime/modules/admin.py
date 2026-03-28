@@ -22,6 +22,7 @@ import textwrap
 import time
 import traceback
 import base64
+import random
 import discord
 from contextlib import redirect_stdout
 from discord.ext import commands
@@ -31,10 +32,6 @@ def cleanup_code(content):
     if content.startswith('```') and content.endswith('```'):
         return '\n'.join(content.split('\n')[1:-1])
     return content.strip('` \n')
-
-def is_owner(ctx):
-    print(ctx.message.author)
-    return ctx.message.author.id == 356456393491873795
 
 class Admin(shinobu_cog.ShinobuCog):
     def __init__(self, bot):
@@ -46,6 +43,16 @@ class Admin(shinobu_cog.ShinobuCog):
                 visible_in_help=True
             )
         )
+
+    @commands.command(name="nya", description="Evaluates code.", aliases=["mrrp", "meow", "miao"])
+    async def nya(self, ctx: commands.Context):
+        """:333"""
+
+        cat_noises = [
+            "meow", "mrrp", "nya", "miao", "purr"
+        ]
+
+        await ctx.send(" ".join([random.choice(cat_noises) for _ in range(3)]) + " :333")
 
     @commands.command(name="eval", description="Evaluates code.")
     @commands.is_owner()
