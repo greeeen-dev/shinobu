@@ -44,7 +44,7 @@ class Admin(shinobu_cog.ShinobuCog):
             )
         )
 
-    @commands.command(name="nya", description="Evaluates code.", aliases=["mrrp", "meow", "miao"])
+    @commands.command(name="nya", aliases=["mrrp", "meow", "miao"])
     async def nya(self, ctx: commands.Context):
         """:333"""
 
@@ -54,9 +54,11 @@ class Admin(shinobu_cog.ShinobuCog):
 
         await ctx.send(" ".join([random.choice(cat_noises) for _ in range(3)]) + " :333")
 
-    @commands.command(name="eval", description="Evaluates code.")
+    @commands.command(name="eval")
     @commands.is_owner()
     async def eval(self, ctx: commands.Context, *, body: str):
+        """Evaluates code."""
+
         env = {
             'ctx': ctx,
             'channel': ctx.channel,
@@ -129,17 +131,20 @@ class Admin(shinobu_cog.ShinobuCog):
             else:
                 await ctx.send(f':white_check_mark: Evaluation completed in `{exec_time}` seconds.\n```\n{value}\n```')
 
-    @commands.command(name="shutdown", description="Shuts the bot down.", aliases=["poweroff"])
+    @commands.command(name="shutdown", aliases=["poweroff"])
     @commands.is_owner()
     async def shutdown(self, ctx: commands.Context):
+        """Shuts the bot down."""
         await ctx.reply("shutting down :zzz:")
 
         # Shut down bot
         await self.bot.close()
 
-    @commands.command(name="restart", description="Restarts the bot.", aliases=["reboot"])
+    @commands.command(name="restart", aliases=["reboot"])
     @commands.is_owner()
     async def restart(self, ctx: commands.Context):
+        """Restarts the bot."""
+
         # NOTE: This does NOT update Runtime or Beacon.
         # To update them, fully shut down the bot then start it again.
 
