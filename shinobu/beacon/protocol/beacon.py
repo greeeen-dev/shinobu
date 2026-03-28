@@ -602,6 +602,13 @@ class Beacon:
         # Bridge to platforms
         try:
             results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(tasks, return_exceptions=self.debug)
+        except TimeoutError:
+            # Wipe webhook cache
+            for should_wipe in self._webhook_cache_wipe:
+                driver: beacon_driver.BeaconDriver = self._drivers.get_driver(should_wipe)
+                driver.webhooks.clear_webhooks()
+                self._webhook_cache_wipe.remove(should_wipe)
+            raise
         except:
             # Cancel pending actions
             self._cancel_pending_actions(content.original_id)
