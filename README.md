@@ -24,6 +24,12 @@ done and over with.
 So I'm starting from a clean state and building a new bridge that better adapts to today's needs,
 that's also flexible and ready for the demands of tomorrow.
 
+## Is Shinobu production-ready?
+**No.**
+
+Although I am testing this in some communities, Shinobu should **not** be used for production use.
+It is still a heavy work in progress and many features are either missing or incomplete.
+
 ## Todo
 - [X] Shinobu Runtime (core, secrets manager, debug tools, etc)
 - [X] Basic Discord cross-server bridge (v0.1)
