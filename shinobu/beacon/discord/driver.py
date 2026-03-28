@@ -324,6 +324,10 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             reply_url: str = f"https://discord.com/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
             reply_content: str | None = content.reply_content_all[reply_message_group.id] if content.reply_content_all else None
 
+            # Apply preferred name
+            if reply_message.preferred_name:
+                reply_author = reply_message.preferred_name
+
             # Create reply container (will get ID 10X)
             reply_container: discord.ui.Container = discord.ui.Container()
 
@@ -602,7 +606,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False):
+                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False,
+                   preferred_name: str | None = None, preferred_avatar: str | None = None):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None
@@ -626,6 +631,12 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         if send_as_user:
             custom_name = send_as.display_name
             custom_avatar = send_as.avatar_url
+
+        # Apply preferred name and avatar
+        if preferred_name:
+            custom_name = preferred_name
+        if preferred_avatar:
+            custom_avatar = preferred_avatar
 
         # Convert message content data
         discord_content: DiscordMessageContent = await self._to_discord_content(
@@ -658,6 +669,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 content=discord_content.raw_content,
                 attachments=len(discord_content.files),
                 replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
+                preferred_name=preferred_name,
+                preferred_avatar=preferred_avatar,
                 webhook_id=None
             )
 
@@ -697,6 +710,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             content=discord_content.raw_content,
             attachments=len(discord_content.files),
             replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
+            preferred_name=preferred_name,
+            preferred_avatar=preferred_avatar,
             webhook_id=webhook_id if webhook_obj else None
         )
 

@@ -223,8 +223,11 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
             reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
             reply_url: str = f"https://web.fluxer.app/channels/{reply_message.server.id}/{reply_message.channel.id}/{reply_message.id}"
-            reply_content: str | None = content.reply_content_all[
-                reply_message_group.id] if content.reply_content_all else None
+            reply_content: str | None = content.reply_content_all[reply_message_group.id] if content.reply_content_all else None
+
+            # Apply preferred name
+            if reply_message.preferred_name:
+                reply_author = reply_message.preferred_name
 
             # Create reply embed
             reply_embed: fluxer.Embed = fluxer.Embed()
@@ -383,7 +386,8 @@ class FluxerDriver(beacon_driver.BeaconDriver):
     # noinspection DuplicatedCode
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
-                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False):
+                   webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False,
+                   preferred_name: str | None = None, preferred_avatar: str | None = None):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None
@@ -407,6 +411,12 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         if send_as_user:
             custom_name = send_as.display_name
             custom_avatar = send_as.avatar_url
+
+        # Apply preferred name and avatar
+        if preferred_name:
+            custom_name = preferred_name
+        if preferred_avatar:
+            custom_avatar = preferred_avatar
 
         # Convert message content data
         fluxer_content: FluxerMessageContent = await self._to_fluxer_content(
@@ -446,6 +456,8 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 content=fluxer_content.raw_content,
                 attachments=len(fluxer_content.files),
                 replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
+                preferred_name=preferred_name,
+                preferred_avatar=preferred_avatar,
                 webhook_id=None
             )
 
@@ -482,6 +494,8 @@ class FluxerDriver(beacon_driver.BeaconDriver):
             content=fluxer_content.raw_content,
             attachments=len(fluxer_content.files),
             replies=[reply.get_message_for(channel) for reply in content.replies] if channel else [],
+            preferred_name=preferred_name,
+            preferred_avatar=preferred_avatar,
             webhook_id=webhook_id if webhook_obj else None
         )
 

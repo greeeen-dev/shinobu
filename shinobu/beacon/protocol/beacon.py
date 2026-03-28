@@ -303,6 +303,8 @@ class Beacon:
                 author=user,
                 server=server,
                 channel=channel,
+                preferred_name=message_data.get("preferred_name"),
+                preferred_avatar=message_data.get("preferred_avatar"),
                 webhook_id=message_data.get("webhook_id")
             )
 
@@ -435,7 +437,8 @@ class Beacon:
 
     async def _send_platform(self, driver: beacon_driver.BeaconDriver, author: beacon_member.BeaconMember,
                              space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
-                             self_send: bool = False) -> list[beacon_message.BeaconMessage]:
+                             preferred_name: str | None, preferred_avatar: str | None, self_send: bool = False
+                             ) -> list[beacon_message.BeaconMessage]:
         space_members: list[beacon_space.BeaconSpaceMember] = [
             member for member in space.members if member.platform == driver.platform
         ]
@@ -447,7 +450,8 @@ class Beacon:
                 [member.channel, content],
                 {
                     "send_as": author, "webhook_id": member.webhook_id, "self_send": self_send,
-                    "compatibility": True #space.compatibility
+                    "compatibility": space.compatibility, "preferred_name": preferred_name,
+                    "preferred_avatar": preferred_avatar
                 }
             )
             tasks.append(task)
@@ -547,7 +551,8 @@ class Beacon:
 
     async def send(self, author: beacon_member.BeaconMember | beacon_member.BeaconPartialMember,
                    space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
-                   webhook_id: str | None = None) -> beacon_message.BeaconMessageGroup | None:
+                   webhook_id: str | None = None, preferred_name: str | None = None, preferred_avatar: str | None = None
+                   ) -> beacon_message.BeaconMessageGroup | None:
         """Sends a message to a Space."""
 
         if not self.initialized:
@@ -594,7 +599,7 @@ class Beacon:
             driver = self._drivers.get_driver(platform)
             task: BeaconCallback = BeaconCallback(
                 self._send_platform,
-                args=[driver, author, space, content]
+                args=[driver, author, space, content, preferred_name, preferred_avatar]
             )
             tasks.append(task)
 

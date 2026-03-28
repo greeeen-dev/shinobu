@@ -358,10 +358,6 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             # We can't bridge
             return
 
-        # Get the ID of the webhook to use
-        membership: beacon_space.BeaconSpaceMember = space.get_member(server)
-        webhook_id = membership.webhook_id
-
         # Convert message data to message.BeaconMessageContent
         content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
 
@@ -370,7 +366,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             author=author,
             space=space,
             content=content,
-            webhook_id=webhook_id,
+            webhook_id=str(message.webhook_id) if message.webhook_id else None,
             skip_filter=True
         )
 
@@ -384,7 +380,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
                 author=author,
                 space=space,
                 content=content,
-                webhook_id=webhook_id
+                webhook_id=str(message.webhook_id) if message.webhook_id else None
             )
         except beacon.BeaconPlatformDisabled:
             pass

@@ -300,9 +300,16 @@ class StoatBot(stoat_commands.Bot):
             # We can't bridge
             return
 
-        # Get the ID of the webhook to use
-        membership: beacon_space.BeaconSpaceMember = space.get_member(server)
-        webhook_id = membership.webhook_id
+        # Also reflect masquerade/webhook data
+        preferred_name: str | None = None
+        preferred_avatar: str | None = None
+
+        if message.masquerade:
+            preferred_name = message.masquerade.name
+            preferred_avatar = message.masquerade.avatar
+        elif message.webhook:
+            preferred_name = message.webhook.name
+            preferred_avatar = message.webhook.avatar
 
         # Convert message data to message.BeaconMessageContent
         content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
@@ -312,7 +319,7 @@ class StoatBot(stoat_commands.Bot):
             author=author,
             space=space,
             content=content,
-            webhook_id=webhook_id,
+            webhook_id=message.author_id if message.webhook else None,
             skip_filter=True
         )
 
@@ -326,7 +333,9 @@ class StoatBot(stoat_commands.Bot):
                 author=author,
                 space=space,
                 content=content,
-                webhook_id=webhook_id
+                webhook_id=message.author_id if message.webhook else None,
+                preferred_name=preferred_name,
+                preferred_avatar=preferred_avatar
             )
         except beacon.BeaconPlatformDisabled:
             pass

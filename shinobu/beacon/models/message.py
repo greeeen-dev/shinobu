@@ -198,7 +198,7 @@ class BeaconMessage(abc.BeaconABC):
     def __init__(self, message_id: str, platform: str, origin_platform: str, author: beacon_user.BeaconUser,
                  server: beacon_server.BeaconServer | None = None, channel: beacon_channel.BeaconChannel | None = None,
                  content: str | dict | None = None, attachments: int = 0, replies: list['BeaconMessage'] | None = None,
-                 webhook_id: str | None = None):
+                 preferred_name: str | None = None, preferred_avatar: str | None = None, webhook_id: str | None = None):
         super().__init__(message_id, platform)
         self._origin_platform: str = origin_platform
         self._author: beacon_user.BeaconUser = author
@@ -207,6 +207,8 @@ class BeaconMessage(abc.BeaconABC):
         self._content: str | dict | None = content
         self._attachments: int = attachments
         self._replies: list[BeaconMessage] = replies or []
+        self._preferred_name: str | None = preferred_name
+        self._preferred_avatar: str | None = preferred_avatar
         self._webhook_id: str | None = webhook_id
 
     @property
@@ -237,6 +239,14 @@ class BeaconMessage(abc.BeaconABC):
     def webhook_id(self) -> str:
         return self._webhook_id
 
+    @property
+    def preferred_name(self) -> str | None:
+        return self._preferred_name
+
+    @property
+    def preferred_avatar(self) -> str | None:
+        return self._preferred_avatar
+
     def edit_content(self, new_content: str | dict | None):
         self._content = new_content
 
@@ -251,7 +261,9 @@ class BeaconMessage(abc.BeaconABC):
             "author_id": self.author.id,
             "server_id": self.server.id if self.server else None,
             "channel_id": self.channel.id if self.channel else None,
-            "webhook_id": self.webhook_id
+            "webhook_id": self.webhook_id,
+            "preferred_name": self.preferred_name,
+            "preferred_avatar": self.preferred_avatar,
         }
 
         converted_replies: list[str] = []
