@@ -385,6 +385,12 @@ class BeaconSpace:
             raise BeaconSpaceNotJoined("Server is not in this Space")
 
         self._members.remove(member)
+
+        # Remove member from partial members as well
+        for partial_member in self._partial_members:
+            if partial_member.server_id == member.server_id:
+                self._partial_members.remove(partial_member)
+                break
     
     def get_member(self, server: beacon_server.BeaconServer) -> BeaconSpaceMember | None:
         """Gets a Space member."""
