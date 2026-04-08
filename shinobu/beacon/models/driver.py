@@ -86,7 +86,7 @@ class BeaconDriver:
         self._file_limit: int = 26214400 # Filesize limit for the platform. This can be overriden by server limits if available
         self._file_count_limit: int = 10  # File count for the platform.
 
-    def get_user(self, user_id: str) -> beacon_user.BeaconUser | None:
+    def get_user(self, user_id: str, expensive: bool = False) -> beacon_user.BeaconUser | None:
         """Gets a user."""
         raise BeaconDriverUnsupported()
 
