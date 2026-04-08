@@ -293,10 +293,6 @@ class Beacon:
             server: beacon_server.BeaconServer = destination_driver.get_server(message_data.get("server_id"))
             channel: beacon_channel.BeaconChannel | None = destination_driver.get_channel(server, message_data.get("channel_id")) if server else None
 
-            if not user and server:
-                # Use expensive get
-                user = origin_driver.get_user(message_data.get("author_id"), expensive=True)
-
             if not user or not server or not channel:
                 continue
 

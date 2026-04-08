@@ -536,7 +536,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         return content
 
     # Beacon driver functions
-    def get_user(self, user_id: str, expensive: bool = False):
+    def get_user(self, user_id: str):
         user = self.bot.get_user(int(user_id))
 
         if not user:

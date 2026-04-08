@@ -295,21 +295,11 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
 
     # Beacon driver functions
-    def get_user(self, user_id: str, expensive: bool = False):
+    def get_user(self, user_id: str):
         user = self.bot.get_user(user_id)
 
         if not user:
-            if expensive:
-                for server in self.bot.servers:
-                    user = server.get_member(user_id)
-
-                    if user:
-                        break
-
-                if not user:
-                    return None
-            else:
-                return None
+            return None
 
         return self._to_beacon_user(user)
 
