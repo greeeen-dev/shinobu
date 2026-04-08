@@ -16,7 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 import discord
-from discord.ext import bridge
+from discord.ext import bridge, commands
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.models import message as beacon_message
@@ -41,7 +41,7 @@ class BeaconModeration(shinobu_cog.ShinobuCog):
     async def moderation_universal(self, ctx):
         pass
 
-    @discord.user_command(name="Message properties")
+    @commands.message_command(name="Message properties")
     async def properties(self, ctx: discord.ApplicationContext, message: discord.Message):
         # Get message
         message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
