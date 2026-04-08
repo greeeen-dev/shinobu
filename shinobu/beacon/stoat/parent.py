@@ -20,7 +20,7 @@ import asyncio
 import traceback
 import stoat
 from discord.ext import commands
-from stoat.ext import commands as stoat_commands
+from stoat.ext import commands as stoat_commands, chunking
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.stoat import driver as stoat_driver
@@ -430,6 +430,7 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
 
         # Create stoat bot attribute
         self.stoat_bot: StoatBot | stoat_commands.Bot | None = None
+        self.stoat_chunker: chunking.MemberChunker | None = None
 
         # Check if driver is already initialized
         if "stoat" in self._beacon.drivers.platforms:
@@ -485,6 +486,7 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
                         command_prefix=self.bot.command_prefix,
                         token=token
                     )
+                    self.stoat_chunker = chunking.MemberChunker(self.stoat_bot)
                     self._driver.replace_bot(self.stoat_bot)
 
                 # Load extensions
