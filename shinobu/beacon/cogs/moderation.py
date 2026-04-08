@@ -46,6 +46,9 @@ class BeaconModeration(shinobu_cog.ShinobuCog):
         # Get message
         message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
 
+        if not message_obj:
+            return await ctx.respond("could not get message :c", ephemeral=True)
+
         # Get message info
         info: str = message_obj.readable_info()
 
