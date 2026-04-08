@@ -8,6 +8,7 @@
     "shinobu.beacon.cogs.backend",
     "shinobu.beacon.cogs.manager",
     "shinobu.beacon.cogs.frontend",
+    "shinobu.beacon.cogs.moderation",
     "shinobu.beacon.discord.parent",
     "shinobu.beacon.stoat.parent",
     "shinobu.beacon.fluxer.parent"

@@ -151,6 +151,7 @@ class BeaconMessageGroup:
 
         for message in messages:
             self._messages.update({message.id: message})
+            message.group = self
 
     @property
     def id(self) -> str:
@@ -210,13 +211,14 @@ class BeaconMessage(abc.BeaconABC):
         self._preferred_name: str | None = preferred_name
         self._preferred_avatar: str | None = preferred_avatar
         self._webhook_id: str | None = webhook_id
+        self._group: BeaconMessageGroup | None = None
 
     @property
     def origin_platform(self) -> str:
         return self._origin_platform
 
     @property
-    def author(self) -> beacon_user.BeaconUser | beacon_webhook.BeaconWebhook:
+    def author(self) -> beacon_user.BeaconUser:
         return self._author
 
     @property
@@ -246,6 +248,18 @@ class BeaconMessage(abc.BeaconABC):
     @property
     def preferred_avatar(self) -> str | None:
         return self._preferred_avatar
+
+    @property
+    def group(self) -> BeaconMessageGroup | None:
+        return self._group
+
+    @group.setter
+    def group(self, new_group: BeaconMessageGroup | None):
+        self._group = new_group
+
+    @property
+    def group_id(self) -> str | None:
+        return self.group.id if self.group else None
 
     def edit_content(self, new_content: str | dict | None):
         self._content = new_content
@@ -280,3 +294,54 @@ class BeaconMessage(abc.BeaconABC):
             converted.update({"content": self.content})
 
         return converted
+
+    def readable_info(self) -> str:
+        # Add message info
+        message_info_lines: list[str] = ["--- MESSAGE INFO ---"]
+
+        if self.group:
+            message_info_lines.append(f"Group ID: {self.group_id}")
+            message_info_lines.append(f"Group messages: {len(self.group.messages)}")
+            message_info_lines.append(f"Group author ID: {self.group.author_id}")
+            message_info_lines.append(f"Group space ID: {self.group.space_id}")
+        else:
+            message_info_lines.append("Doesn't belong to a group. That's odd.")
+
+        if self.preferred_name:
+            message_info_lines.append(f"Preferred name: {self.preferred_name}")
+
+        message_info_lines.append(f"Preferred avatar: {'yes' if self.preferred_avatar else 'no'}")
+
+        message_info_lines.append("\n")
+
+        # Add author info
+        author_info_lines: list[str] = ["--- MESSAGE AUTHOR INFO ---"]
+
+        if self.author:
+            author_info_lines.append(f"Author platform: {self.author.platform}")
+            author_info_lines.append(f"Author ID: {self.author.id}")
+            author_info_lines.append(f"Author name: {self.author.name}")
+            author_info_lines.append(f"Author display name: {self.author.display_name}")
+            author_info_lines.append(f"Author is bot: {'yes' if self.author.bot else 'no'}")
+        else:
+            author_info_lines.append("Doesn't have an author. That's odd.")
+
+        author_info_lines.append("\n")
+
+        # Add source info
+        source_info_lines: list[str] = ["--- MESSAGE SOURCE INFO ---"]
+
+        if self.server:
+            source_info_lines.append(f"Source server ID: {self.server.id}")
+        else:
+            source_info_lines.append("Doesn't have a source server. That's odd.")
+
+        if self.channel:
+            source_info_lines.append(f"Source channel ID: {self.channel.id}")
+        else:
+            source_info_lines.append("Doesn't have a source channel. That's odd.")
+
+        # Merge lines
+        lines: list[str] = message_info_lines + author_info_lines + source_info_lines
+
+        return "\n".join(lines)
