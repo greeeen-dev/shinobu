@@ -300,8 +300,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
         if not user:
             if expensive:
-                for server_id in self.bot.servers:
-                    server = self.bot.get_server(server_id)
+                for server in self.bot.servers:
                     user = server.get_member(user_id)
 
                     if user:
