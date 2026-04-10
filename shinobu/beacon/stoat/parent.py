@@ -201,7 +201,9 @@ class StoatBot(stoat_commands.Bot):
             return
 
         # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(partial_message)
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(
+            partial_message, compatibility=space.compatibility
+        )
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
@@ -317,7 +319,9 @@ class StoatBot(stoat_commands.Bot):
             preferred_avatar = message.webhook.avatar
 
         # Convert message data to message.BeaconMessageContent
-        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(message)
+        content: beacon_message.BeaconMessageContent = await self._to_beacon_content(
+            message, compatibility=space.compatibility
+        )
 
         # Run preliminary checks
         preliminary_block: beacon.BeaconMessageBlockedReason | None = await self._beacon.can_send(
