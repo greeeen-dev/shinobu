@@ -145,11 +145,19 @@ class BeaconDriver:
 
     def sanitize_inbound(self, content: str) -> str:
         """Sanitizes content to be friendly with the driver's platform."""
-        raise BeaconDriverUnsupported()
+        return content
 
     def sanitize_outbound(self, content: str) -> str:
         """Sanitizes content to be friendly with other platforms."""
-        raise BeaconDriverUnsupported()
+        return content
+
+    def sanitize_inbound_compat(self, content: str) -> str:
+        """Sanitizes content to be friendly with other platforms with compatibility mode enabled."""
+        return content
+
+    def sanitize_outbound_compat(self, content: str) -> str:
+        """Sanitizes content to be friendly with driver's platform with compatibility mode enabled."""
+        return content
 
     # The following properties and methods are already implemented but can be overwritten
     # for custom behavior.

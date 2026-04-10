@@ -54,10 +54,15 @@ class StoatBot(stoat_commands.Bot):
     async def add_extensions(self):
         await self.load_extension("shinobu.beacon.stoat.modules.frontend")
 
-    async def _to_beacon_content(self, message: stoat.Message | stoat.PartialMessage) -> beacon_message.BeaconMessageContent:
+    async def _to_beacon_content(self, message: stoat.Message | stoat.PartialMessage, compatibility: bool = False
+                                 ) -> beacon_message.BeaconMessageContent:
         # Create text content block
+        final_content: str = self._driver.sanitize_outbound(str(message.content))
+        if compatibility:
+            final_content = self._driver.sanitize_outbound_compat(final_content)
+
         text_content: beacon_content.BeaconContentText = beacon_content.BeaconContentText(
-            content=self._driver.sanitize_outbound(str(message.content))
+            content=final_content
         )
 
         # Create embed blocks

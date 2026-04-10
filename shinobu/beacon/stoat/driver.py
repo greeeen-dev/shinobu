@@ -198,9 +198,10 @@ class StoatDriver(beacon_driver.BeaconDriver):
             replies.append(reply_obj)
 
         # Get final content
-        final_content: str = "\n".join(text_components)
+        final_content: str = self.sanitize_inbound("\n".join(text_components))
+
         if compatibility:
-            final_content = self._sanitize_inbound_compat(final_content)
+            final_content = self.sanitize_inbound_compat(final_content)
 
         # Assemble to StoatMessageContent
         return StoatMessageContent(
@@ -275,8 +276,20 @@ class StoatDriver(beacon_driver.BeaconDriver):
         # Return content
         return content
 
-    @staticmethod
-    def _sanitize_inbound_compat(content: str) -> str:
+    def sanitize_outbound_compat(self, content: str) -> str:
+        # Detect spoilered content
+        components: list[str] = content.split('!!||')
+
+        if len(components) < 2:
+            return content
+
+        for index in range(1, len(components)):
+            if "||!!" in components[index]:
+                components[index] = "||" + components[index].replace("||!!", "||", 1)
+
+        return ''.join(components)
+
+    def sanitize_inbound_compat(self, content: str) -> str:
         # Detect spoilered content
         components: list[str] = content.split('||')
 
