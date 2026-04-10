@@ -352,7 +352,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 reply_text= discord.ui.TextDisplay(
                     f"\U000021AA\U0000FE0F **Replying to @{reply_author}** - {reply_content}"
                 )
-            elif content.reply_attachments_all[reply_message_group.id] > 0:
+            elif content.reply_attachments_all.get(reply_message_group.id, 0) > 0:
                 reply_text = discord.ui.TextDisplay(
                     f"\U000021AA\U0000FE0F **Replying to @{reply_author}** \U0001F5BC\U0000FE0F"
                 )
