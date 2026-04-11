@@ -63,7 +63,7 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
             error_description = "You don't have the right permissions to run this command."
         elif isinstance(error, commands.MissingRequiredArgument):
             error_title = "eh? 0.0"
-            error_description = str(error)
+            error_description = f"`{error.param.name}` is a required argument that is missing."
         else:
             # Unexpected error
             record_error = True
