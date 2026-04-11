@@ -55,25 +55,39 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         is_slash: bool = check_slash.is_slash(ctx)
         traceback_str: str = "".join(traceback.format_exception(error))
         error_id: str = str(uuid.uuid4())
+        record_error: bool = False
+        error_title: str = "oh nooooo >.<"
+        error_description: str = "An error occurred and the command failed to run. Sorry about that... :<"
 
-        # Record error
-        error_data: dict[str, int] = {
-            "server": ctx.guild.id,
-            "channel": ctx.channel.id,
-            "user": ctx.author.id
-        }
-        self.bot.errors.add(error_id, traceback_str, error_data)
+        # Handle expected errors
+        if type(error) is commands.CheckFailure:
+            error_title = "nu >:c"
+            error_description = "You don't have the right permissions to run this command."
+        else:
+            # Unexpected error
+            record_error = True
 
         embed: discord.Embed = discord.Embed(
-            title="oh nooooo >.<",
-            description="An error occurred and the command failed to run. Sorry about that... :<",
+            title=error_title,
+            description=error_description,
             color=Colors.error
         )
-        embed.add_field(
-            name="Error UUID",
-            value=f"`{error_id}`"
-        )
-        embed.set_footer(text="Send the error UUID to this instance's owner for assistance.")
+
+        if record_error:
+            # Record error
+            error_data: dict[str, int] = {
+                "server": ctx.guild.id,
+                "channel": ctx.channel.id,
+                "user": ctx.author.id
+            }
+            self.bot.errors.add(error_id, traceback_str, error_data)
+
+            # Add error UUID
+            embed.add_field(
+                name="Error UUID",
+                value=f"`{error_id}`"
+            )
+            embed.set_footer(text="Send the error UUID to this instance's owner for assistance.")
 
         if is_slash and not ctx.interaction.response.is_done():
             await ctx.respond(embed=embed, ephemeral=True)
