@@ -26,7 +26,7 @@ from shinobu.runtime.utils import check_slash
 from shinobu.runtime.models import shinobu_cog
 
 class ShinobuEvents(shinobu_cog.ShinobuCog):
-    def __init__(self, bot, **kwargs):
+    def __init__(self, bot):
         super().__init__(
             bot,
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
@@ -36,7 +36,8 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
             )
         )
         self.expected_errors: list = [
-            commands.CheckFailure
+            commands.CheckFailure,
+            commands.MissingRequiredArgument
         ]
 
     def check_error_expected(self, error):
@@ -60,6 +61,9 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         if isinstance(error, commands.CheckFailure):
             error_title = "nu >:c"
             error_description = "You don't have the right permissions to run this command."
+        elif isinstance(error, commands.MissingRequiredArgument):
+            error_title = "eh? 0.0"
+            error_description = str(error)
         else:
             # Unexpected error
             record_error = True
@@ -108,14 +112,14 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):
         if not self.check_error_expected(error):
-            traceback.print_exc(error)
+            traceback.print_exception(error)
 
         await self.handle_error(ctx, error)
 
     @commands.Cog.listener()
     async def on_application_command_error(self, ctx, error):
         if not self.check_error_expected(error):
-            traceback.print_exc(error)
+            traceback.print_exception(error)
 
         await self.handle_error(ctx, error)
 
