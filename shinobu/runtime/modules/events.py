@@ -35,23 +35,20 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
                 visible_in_help=False
             )
         )
+        self.expected_errors: list = [
+            commands.CheckFailure
+        ]
 
-    @commands.Cog.listener()
-    async def on_ready(self):
-        print("Shinobu Runtime is ready! :3")
-        print(f"Logged in as {self.bot.user.name}#{self.bot.user.discriminator} ({self.bot.user.id})")
+    def check_error_expected(self, error):
+        for expected in self.expected_errors:
+            if isinstance(error, expected):
+                return True
 
-        # Handle restart
-        if self.bot.restart_message_id:
-            channel: discord.TextChannel | None = self.bot.get_channel(self.bot.restart_message_channel_id)
-            if not channel:
-                return
+        return False
 
-            message: discord.PartialMessage = discord.PartialMessage(channel=channel, id=self.bot.restart_message_id)
-            await message.edit(content="bot restarted! :white_check_mark:")
-
-    @commands.Cog.listener()
-    async def on_bridge_command_error(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, error):
+    async def handle_error(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext |
+                                      discord.ApplicationContext | commands.Context,
+                           error):
         is_slash: bool = check_slash.is_slash(ctx)
         traceback_str: str = "".join(traceback.format_exception(error))
         error_id: str = str(uuid.uuid4())
@@ -60,7 +57,7 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         error_description: str = "An error occurred and the command failed to run. Sorry about that... :<"
 
         # Handle expected errors
-        if type(error) is commands.CheckFailure:
+        if isinstance(error, commands.CheckFailure):
             error_title = "nu >:c"
             error_description = "You don't have the right permissions to run this command."
         else:
@@ -93,6 +90,34 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
             await ctx.respond(embed=embed, ephemeral=True)
         else:
             await ctx.send(embed=embed)
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        print("Shinobu Runtime is ready! :3")
+        print(f"Logged in as {self.bot.user.name}#{self.bot.user.discriminator} ({self.bot.user.id})")
+
+        # Handle restart
+        if self.bot.restart_message_id:
+            channel: discord.TextChannel | None = self.bot.get_channel(self.bot.restart_message_channel_id)
+            if not channel:
+                return
+
+            message: discord.PartialMessage = discord.PartialMessage(channel=channel, id=self.bot.restart_message_id)
+            await message.edit(content="bot restarted! :white_check_mark:")
+
+    @commands.Cog.listener()
+    async def on_command_error(self, ctx, error):
+        if not self.check_error_expected(error):
+            traceback.print_exc(error)
+
+        await self.handle_error(ctx, error)
+
+    @commands.Cog.listener()
+    async def on_application_command_error(self, ctx, error):
+        if not self.check_error_expected(error):
+            traceback.print_exc(error)
+
+        await self.handle_error(ctx, error)
 
 def setup(bot):
     bot.add_cog(ShinobuEvents(bot))
