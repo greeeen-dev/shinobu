@@ -212,15 +212,8 @@ class StoatDriver(beacon_driver.BeaconDriver):
         )
 
     def sanitize_outbound(self, content: str) -> str:
-        # noinspection DuplicatedCode
+        # Handle user mentions
         user_mentions = [item.split('>')[0] for item in content.split("<@")] if len(content.split("<@")) > 1 else []
-        channel_mentions = [item.split('>')[0] for item in content.split("<#")] if len(content.split("<#")) > 1 else []
-        emoji_mentions = [
-                             item.split('>')[0].split(':')[1] for item in content.split("<:")
-                         ] if len(content.split("<:")) > 1 else [] + [
-                             item.split('>')[0].split(':')[1] for item in content.split("<a:")
-                         ] if len(content.split("<a:")) > 1 else []
-
         for user_mention in user_mentions:
             # Check if this is a role mention
             if user_mention.startswith('&'):
@@ -233,6 +226,8 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
             content = content.replace(f"<@{user_mention}>", f"@{user.display_name or user.name}")
 
+        # Handle channel mentions
+        channel_mentions = [item.split('>')[0] for item in content.split("<#")] if len(content.split("<#")) > 1 else []
         for channel_mention in channel_mentions:
             channel = self.bot.get_channel(channel_mention)
             if not channel:
@@ -241,6 +236,12 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
             content = content.replace(f"<#{channel_mention}>", f"#{channel.name}")
 
+        # Handle emoji mentions
+        emoji_mentions = [
+            item.split('>')[0].split(':')[1] for item in content.split("<:")
+        ] if len(content.split("<:")) > 1 else [] + [
+            item.split('>')[0].split(':')[1] for item in content.split("<a:")
+        ] if len(content.split("<a:")) > 1 else []
         for emoji_mention in emoji_mentions:
             emoji = self.bot.get_emoji(emoji_mention)
             if not emoji:
@@ -251,6 +252,23 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 f"<a:{emoji.name}:{emoji_mention}>" if emoji.animated else f"<:{emoji.name}:{emoji_mention}>",
                 f":{emoji.name}:"
             )
+
+        # Fix markdown
+        content_components: list[str] = content.split("\n")
+        for index in range(len(content_components)):
+            component: str = content_components[index]
+
+            # There's probably a cleaner way to do this, but I can't be bothered to
+            # think of another way than an if-else statement
+            if component.startswith("##### "):
+                content_components[index] = component.replace("##### ", "-# ", 1)
+            elif component.startswith("> ##### "):
+                content_components[index] = component.replace("> ##### ", "> -# ", 1)
+            elif component.startswith("###### "):
+                content_components[index] = component.replace("###### ", "-# ", 1)
+            elif component.startswith("> ###### "):
+                content_components[index] = component.replace("> ###### ", "> -# ", 1)
+        content = "\n".join(content_components)
 
         return content
 
@@ -271,12 +289,17 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
             if component.startswith("-# "):
                 content_components[index] = component.replace("-# ", "##### ", 1)
+            elif component.startswith("> -# "):
+                content_components[index] = component.replace("> -# ", "> ##### ", 1)
         content = "\n".join(content_components)
 
         # Return content
         return content
 
     def sanitize_outbound_compat(self, content: str) -> str:
+        """Sanitizes outbound content for compatibility mode.
+        Only run this after running sanitize_outbound."""
+
         # Detect spoilered content
         components: list[str] = content.split('!!||')
 
@@ -290,6 +313,9 @@ class StoatDriver(beacon_driver.BeaconDriver):
         return ''.join(components)
 
     def sanitize_inbound_compat(self, content: str) -> str:
+        """Sanitizes inbound content for compatibility mode.
+        Only run this after running sanitize_inbound."""
+
         # Detect spoilered content
         components: list[str] = content.split('||')
 
