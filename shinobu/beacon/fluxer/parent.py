@@ -174,7 +174,13 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
             return
 
         print("Starting Fluxer client...")
-        token: str = await self.bot.loop.run_in_executor(None, lambda: self._shinobu_secrets.retrieve("TOKEN_FLUXER"))
+
+        try:
+            token: str = await self.bot.loop.run_in_executor(None, lambda: self._shinobu_secrets.retrieve("TOKEN_FLUXER"))
+        except KeyError:
+            print("Could not find Fluxer token, cannot proceed.")
+            self._beacon.drivers.unreserve_driver("fluxer")
+            return
 
         # Start Fluxer bot
         task: asyncio.Task = self.bot.loop.create_task(self.run_fluxer(token))

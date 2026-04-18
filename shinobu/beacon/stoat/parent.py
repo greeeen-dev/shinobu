@@ -544,7 +544,12 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
         if stoat_is_unreliable:
             print("Note: Stoat/stoat.py can be problematic! If messages won't bridge, reboot the bot.")
 
-        token: str = await self.bot.loop.run_in_executor(None, lambda: self._shinobu_secrets.retrieve("TOKEN_STOAT"))
+        try:
+            token: str = await self.bot.loop.run_in_executor(None, lambda: self._shinobu_secrets.retrieve("TOKEN_STOAT"))
+        except KeyError:
+            print("Could not find Stoat token, cannot proceed.")
+            self._beacon.drivers.unreserve_driver("stoat")
+            return
 
         # Start stoat bot
         task: asyncio.Task = self.bot.loop.create_task(self.run_stoat(token))
