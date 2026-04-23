@@ -258,16 +258,10 @@ class StoatDriver(beacon_driver.BeaconDriver):
         for index in range(len(content_components)):
             component: str = content_components[index]
 
-            # There's probably a cleaner way to do this, but I can't be bothered to
-            # think of another way than an if-else statement
-            if component.startswith("##### "):
+            if component.startswith("##### ") or component.startswith("> ##### "):
                 content_components[index] = component.replace("##### ", "-# ", 1)
-            elif component.startswith("> ##### "):
-                content_components[index] = component.replace("> ##### ", "> -# ", 1)
-            elif component.startswith("###### "):
+            elif component.startswith("###### ") or component.startswith("> ###### "):
                 content_components[index] = component.replace("###### ", "-# ", 1)
-            elif component.startswith("> ###### "):
-                content_components[index] = component.replace("> ###### ", "> -# ", 1)
         content = "\n".join(content_components)
 
         return content
