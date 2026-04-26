@@ -77,7 +77,7 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         if record_error:
             # Record error
             error_data: dict[str, int] = {
-                "server": ctx.guild.id,
+                "server": ctx.guild.id if ctx.guild else None,
                 "channel": ctx.channel.id,
                 "user": ctx.author.id
             }

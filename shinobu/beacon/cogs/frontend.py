@@ -93,7 +93,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
             should_hide: bool = False
             if space.private:
                 # Check if we have access to this space
-                should_hide = not space.has_access(discord_driver.get_server(str(ctx.guild.id)))
+                should_hide = not space.has_access(discord_driver.get_server(str(ctx.guild.id))) if ctx.guild else True
 
             entry: ShinobuListEntry = ShinobuListEntry(
                 entry_id=space.id,
