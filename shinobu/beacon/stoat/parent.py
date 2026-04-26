@@ -330,6 +330,10 @@ class StoatBot(stoat_commands.Bot):
         # Convert channel data to channel.BeaconChannel
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, message.channel.id)
 
+        if not author:
+            # what
+            return
+
         # noinspection DuplicatedCode
         if not channel:
             # We can't bridge
@@ -385,7 +389,7 @@ class StoatBot(stoat_commands.Bot):
 
     async def on_message_update(self, event: stoat.MessageUpdateEvent):
         message: stoat.Message = event.after
-        is_pin: bool = event.before.pinned != event.after.pinned
+        is_pin: bool = (event.before.pinned != event.after.pinned) if event.before else False
 
         # Check if message is pending
         if self._beacon.is_pending(str(message.id)):
