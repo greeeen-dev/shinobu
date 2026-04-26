@@ -134,7 +134,7 @@ class ShinobuListContent:
 class ShinobuListBaseView:
     """A base class for list views."""
 
-    def __init__(self, title: str, description: str, color: int, allow_hidden: bool = False):
+    def __init__(self, title: str, description: str, color: int, allow_hidden: bool = False, limit: int = 20):
         self._title: str = title
         self._description: str = description
         self._color: int = color
@@ -143,6 +143,7 @@ class ShinobuListBaseView:
         self._entries: list[ShinobuListEntry] = []
         self._page: int = 0
         self._viewing: ShinobuListEntry | None = None
+        self._limit: int = limit
 
         # Search
         self._search: str | None = None
@@ -181,6 +182,10 @@ class ShinobuListBaseView:
     @property
     def search_query(self) -> str | None:
         return self._search
+
+    @property
+    def limit(self) -> int:
+        return self._limit
 
     @staticmethod
     def add_items(view: discord.ui.View, items: list[discord.ui.ViewItem]):
@@ -324,7 +329,7 @@ class ShinobuListDiscordView(ShinobuListBaseView):
 
         # Render page number
         if not self.is_leaf:
-            embed.set_footer(text=f"Page {self._page + 1} of {self.max_page + 1}")
+            embed.set_footer(text=f"Page {self._page + 1} of {self.max_page + 1} • Total {len(self.visible_current_entries)} entries")
 
         return embed
 
