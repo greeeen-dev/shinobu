@@ -194,8 +194,8 @@ class BeaconSpace:
                  partial_members: list| None = None, invites: list | None = None, bans: list | None = None,
                  private: bool = False, nsfw: bool = False, private_owner_id: str | None = None,
                  private_owner_platform: str | None = None, relay_deletes: bool = True, relay_edits: bool = True,
-                 relay_large_attachments: bool = True, compatibility: bool = False, filters: list | None = None,
-                 filter_configs: dict | None = None):
+                 relay_pins: bool = False, relay_large_attachments: bool = True, compatibility: bool = False,
+                 filters: list | None = None, filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
         self._emoji: str = space_emoji
@@ -211,6 +211,7 @@ class BeaconSpace:
         self._nsfw: bool = nsfw
         self._deletes: bool = relay_deletes
         self._edits: bool = relay_edits
+        self._pins: bool = relay_pins
         self._attachments_url: bool = relay_large_attachments
         self._compatibility: bool = compatibility
         self._filters: list = filters or []
@@ -267,6 +268,10 @@ class BeaconSpace:
     @property
     def relay_edits(self) -> bool:
         return self._edits
+
+    @property
+    def relay_pins(self) -> bool:
+        return self._pins
 
     @property
     def convert_large_files(self) -> bool:
@@ -428,6 +433,7 @@ class BeaconSpace:
                 "nsfw": self.nsfw,
                 "relay_deletes": self.relay_deletes,
                 "relay_edits": self.relay_edits,
+                "relay_pins": self.relay_pins,
                 "convert_large_files": self.convert_large_files,
                 "compatibility": self.compatibility,
             }

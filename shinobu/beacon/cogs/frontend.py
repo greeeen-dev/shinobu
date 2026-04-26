@@ -19,10 +19,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import uuid
 import discord
 from discord.ext import commands, bridge
-from shinobu.runtime.models import shinobu_cog
+from shinobu.runtime.models import shinobu_cog, ui_kit
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.models import (space as beacon_space, driver as beacon_driver, server as beacon_server,
                                    channel as beacon_channel, webhook as beacon_webhook)
+from shinobu.runtime.models.ui_kit import ShinobuListEntry
+
 
 class BeaconFrontend(shinobu_cog.ShinobuCog):
     def __init__(self, bot):
@@ -70,6 +72,43 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
         await ctx.respond(f"space deleted T.T")
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
+
+    @bridge_universal.command(name="spaces")
+    async def list_spaces(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str | None = None):
+        """Shows all available Spaces."""
+
+        # Get driver
+        discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+
+        # Create new list UI
+        list_ui: ui_kit.ShinobuListDiscordView = ui_kit.ShinobuListDiscordView(
+            "Available Spaces",
+            "Available Spaces",
+            self.bot.colors.shinobu
+        )
+
+        # Add spaces
+        for space in self._beacon.spaces.all_spaces:
+            should_hide: bool = False
+            if space.private:
+                # Check if we have access to this space
+                should_hide = not space.has_access(discord_driver.get_server(str(ctx.guild.id)))
+
+            entry: ShinobuListEntry = ShinobuListEntry(
+                entry_id=space.id,
+                name=space.name,
+                emoji=space.emoji,
+                hidden=should_hide
+            )
+            entry.add_field(
+                name="Space ID",
+                value=f"`{space.id}`"
+            )
+
+            list_ui.add_entry(entry)
+
+        # Run loop
+        await list_ui.run(self.bot, ctx)
 
     @bridge_universal.command(name="join-space")
     @commands.is_owner()

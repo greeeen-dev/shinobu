@@ -1,4 +1,4 @@
-py-cord
+py-cord[speed]
 python-dotenv
 pycryptodome
 ujson
@@ -9,7 +9,7 @@ jellyfish
 tld
 better-profanity
 stoat.py
-aiohttp
+aiohttp[speedups]
 argon2-cffi
 psutil
 git+https://github.com/greeeen-dev/capacitor.git

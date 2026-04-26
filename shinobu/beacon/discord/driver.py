@@ -312,6 +312,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         # Process reply
         has_reply: bool = False
+        is_pin: bool = content.type == beacon_message.BeaconMessageType.pins_add
+
         for reply_message_group in content.replies:
             # Find channel-specific reply
             # noinspection DuplicatedCode
@@ -335,7 +337,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             # noinspection PyTypeChecker
             reply_button: discord.ui.Button = discord.ui.Button(
                 style=discord.ButtonStyle.link,
-                label=f'Jump to message',
+                label=f'Jump',
                 url=reply_url
             )
 
@@ -357,6 +359,11 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                     f"\U000021AA\U0000FE0F **Replying to @{reply_author}** \U0001F5BC\U0000FE0F"
                 )
 
+            if is_pin:
+                reply_text = discord.ui.TextDisplay(
+                    f"\U0001F4CC *Pinned a message from @{reply_author}.*"
+                )
+
             # Create reply action row
             reply_section: discord.ui.Section = discord.ui.Section(
                 reply_text, accessory=reply_button
@@ -376,12 +383,15 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             if reply_content_trimmed:
                 reply_button_text = f'Replying to @{reply_author} | {reply_content_trimmed}'
 
+            if is_pin:
+                reply_button_text = f"Pinned a message from @{reply_author}"
+
             # noinspection PyTypeChecker
             legacy_reply_components.add_item(discord.ui.ActionRow(
                 discord.ui.Button(
                     style=discord.ButtonStyle.link,
                     label=reply_button_text,
-                    emoji='\U000021AA\U0000FE0F',
+                    emoji="\U000021AA\U0000FE0F" if not is_pin else "\U0001F4CC",
                     url=reply_url
                 )
             ))
@@ -786,3 +796,17 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         # Delete messages
         await channel.delete_messages([discord.Object(int(message.id)) for message in messages])
+
+    async def _pin(self, message: beacon_message.BeaconMessage):
+        channel = self.bot.get_channel(int(message.channel.id))
+        partial_message: discord.PartialMessage = discord.PartialMessage(channel=channel, id=int(message.id))
+
+        # Pin message
+        await partial_message.pin()
+
+    async def _unpin(self, message: beacon_message.BeaconMessage):
+        channel = self.bot.get_channel(int(message.channel.id))
+        partial_message: discord.PartialMessage = discord.PartialMessage(channel=channel, id=int(message.id))
+
+        # Unpin message
+        await partial_message.unpin()

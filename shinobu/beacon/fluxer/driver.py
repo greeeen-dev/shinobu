@@ -213,6 +213,8 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
         # Process reply
         # To not eat up too many embeds, we'll just convert the first valid reply only
+        is_pin: bool = content.type == beacon_message.BeaconMessageType.pins_add
+
         for reply_message_group in content.replies:
             # Find channel-specific reply
             # noinspection DuplicatedCode
@@ -237,13 +239,20 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 icon_url=reply_message.author.avatar_url if reply_message.author else None
             )
 
-            # Create content text display (if possible)
-            if reply_content:
-                # We'll cap content to 200 characters
-                if len(reply_content) > 200:
-                    reply_content = reply_content[:197] + "..."
+            if is_pin:
+                reply_embed.set_author(
+                    name=f"\U0001F4CC Pinned a message from @{reply_author}",
+                    url=reply_url,
+                    icon_url=reply_message.author.avatar_url if reply_message.author else None
+                )
+            else:
+                # Create content text display (if possible)
+                if reply_content:
+                    # We'll cap content to 200 characters
+                    if len(reply_content) > 200:
+                        reply_content = reply_content[:197] + "..."
 
-                reply_embed.description = reply_content
+                    reply_embed.description = reply_content
 
             # Append embed
             embeds.append(reply_embed)
@@ -511,3 +520,17 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
         # Delete messages
         await channel.delete_messages([int(message.id) for message in messages])
+
+    async def _pin(self, message: beacon_message.BeaconMessage):
+        channel: fluxer.Channel = self.bot.get_channel(int(message.channel.id))
+        message_obj = await channel.fetch_message(int(message.id))
+
+        # Delete message
+        await message_obj.pin()
+
+    async def _unpin(self, message: beacon_message.BeaconMessage):
+        channel: fluxer.Channel = self.bot.get_channel(int(message.channel.id))
+        message_obj = await channel.fetch_message(int(message.id))
+
+        # Delete message
+        await message_obj.unpin()

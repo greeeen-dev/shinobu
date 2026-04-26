@@ -16,19 +16,25 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+from enum import Enum
 from shinobu.beacon.models import (content as beacon_content, abc, user as beacon_user, channel as beacon_channel,
                                    server as beacon_server, webhook as beacon_webhook, file as beacon_file,
                                    messageable as beacon_messageable)
 
+class BeaconMessageType(Enum):
+    default = 0
+    pins_add = 1
+
 class BeaconMessageContent:
     def __init__(self, original_id: str, original_channel_id: str, original_platform: str,
-                 blocks: dict[str, beacon_content.BeaconContentBlock],
+                 blocks: dict[str, beacon_content.BeaconContentBlock], message_type: BeaconMessageType | None = None,
                  files: list[beacon_file.BeaconFile] | None = None, replies: list['BeaconMessageGroup'] | None = None,
                  reply_content: str | dict[str, int] | None = None,
                  reply_attachments: int | dict[str, int] | None = None, suppress_embeds: bool = False):
         self._original_id: str = original_id
         self._original_channel_id: str = original_channel_id
         self._original_platform: str = original_platform
+        self._type: BeaconMessageType = message_type or BeaconMessageType.default
         self._blocks: dict[str, beacon_content.BeaconContentBlock] = blocks
         self._files: list[beacon_file.BeaconFile] = files or []
         self._replies: list[BeaconMessageGroup] = replies or []
@@ -62,6 +68,10 @@ class BeaconMessageContent:
     @property
     def original_platform(self) -> str:
         return self._original_platform
+
+    @property
+    def type(self) -> BeaconMessageType:
+        return self._type
 
     @property
     def blocks(self) -> dict[str, beacon_content.BeaconContentBlock]:

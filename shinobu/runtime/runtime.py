@@ -20,6 +20,7 @@ import tomllib
 import ujson as json
 import discord
 from discord.ext import bridge
+from shinobu.runtime.models import colors
 
 class ShinobuErrorManager:
     def __init__(self):
@@ -51,6 +52,7 @@ class ShinobuBot(bridge.Bot):
         self.__errors: ShinobuErrorManager = ShinobuErrorManager()
         self.__cog_entitlements_loader = None
         self._cleanups = {}
+        self._colors: colors.Colors = colors.Colors()
 
         # Restart state
         self._should_restart: bool = False # Restart on crash
@@ -122,6 +124,10 @@ class ShinobuBot(bridge.Bot):
     @property
     def config(self) -> dict:
         return self._config
+
+    @property
+    def colors(self) -> colors.Colors:
+        return self._colors
 
     @property
     def should_restart(self) -> bool:

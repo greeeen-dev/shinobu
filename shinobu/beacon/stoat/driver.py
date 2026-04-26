@@ -181,6 +181,8 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 embeds.append(StoatBeaconContentBlockConverter.embed(block_obj))
 
         # Process reply
+        is_pin: bool = content.type == beacon_message.BeaconMessageType.pins_add
+
         for reply_message_group in content.replies:
             # Find channel-specific reply
             reply_message: beacon_message.BeaconMessage | None = reply_message_group.get_message_for(destination)
@@ -196,6 +198,13 @@ class StoatDriver(beacon_driver.BeaconDriver):
 
             # Add to replies
             replies.append(reply_obj)
+
+            if is_pin:
+                reply_author: str = f"{reply_message.author.display_name if reply_message.author else '[unknown]'}"
+                embeds.append(stoat.Embed(
+                    title=f"\U0001F4CC Pinned a message from @{reply_author}",
+                    icon_url=reply_message.author.avatar_url if reply_message.author else None
+                ))
 
         # Get final content
         final_content: str = self.sanitize_inbound("\n".join(text_components))
@@ -479,11 +488,13 @@ class StoatDriver(beacon_driver.BeaconDriver):
         )
 
     async def _delete(self, message: beacon_message.BeaconMessage):
-        channel: stoat.Channel = self.bot.get_channel(message.channel.id)
-        message_obj = await channel.fetch_message(message.id)
-
-        # Delete message
-        await message_obj.delete()
+        await self.bot.http.delete_message(message.channel.id, message.id)
 
     async def _purge(self, messages: list[beacon_message.BeaconMessage]):
         await self.bot.http.delete_messages(messages[0].channel.id, [message.id for message in messages])
+
+    async def _pin(self, message: beacon_message.BeaconMessage):
+        await self.bot.http.pin_message(message.channel.id, message.id)
+
+    async def _unpin(self, message: beacon_message.BeaconMessage):
+        await self.bot.http.unpin_message(message.channel.id, message.id)

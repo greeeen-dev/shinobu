@@ -63,6 +63,17 @@ class ShinobuListEntry:
         return self._name
 
     @property
+    def decorated_name_id(self) -> str:
+        return f"{self.decorated_name} (`{self.id}`)"
+
+    @property
+    def decorated_name(self) -> str:
+        if self.emoji:
+            return f"{self.emoji} {self.name}"
+        else:
+            return self.name
+
+    @property
     def description(self) -> str | None:
         return self._description
 
@@ -167,16 +178,26 @@ class ShinobuListBaseView:
     def is_leaf(self) -> bool:
         return len(self._viewing.children) == 0 if self._viewing else False
 
+    @property
+    def search_query(self) -> str | None:
+        return self._search
+
+    @staticmethod
+    def add_items(view: discord.ui.View, items: list[discord.ui.ViewItem]):
+        for item in items:
+            view.add_item(item)
+
     def _search_entries(self) -> list[ShinobuListEntry]:
         results: list[ShinobuListEntry] = []
 
         for item in self.current_entries:
-            name_match: bool = self._search.lower() in item.name.lower() and self._by_title
-            desc_match: bool = self._search.lower() in item.description.lower() and self._by_desc
-            valid_match: bool = name_match or desc_match
+            name_match: bool = self._search.lower() in item.name.lower()
+            desc_match: bool = (self._search.lower() in item.description.lower()) if item.description else False
+            desc_invalid: bool = item.description is None
+            valid_match: bool = name_match and self._by_title or desc_match and self._by_desc
 
             if self._use_both and self._by_title and self._by_desc:
-                valid_match: bool = name_match and desc_match
+                valid_match: bool = name_match and (desc_match or desc_invalid)
 
             if valid_match:
                 results.append(item)
@@ -203,6 +224,11 @@ class ShinobuListBaseView:
         return None
 
     def search(self, query: str, by_title: bool = True, by_desc: bool = True, use_both: bool = False):
+        # Check if an entry exists with this exact ID
+        for entry in self.current_entries:
+            if entry.id == query:
+                return self.select(entry)
+
         if use_both:
             by_title = True
             by_desc = True
@@ -262,18 +288,36 @@ class ShinobuListDiscordView(ShinobuListBaseView):
             color=self._color
         )
 
+        # Show all entries
+        if self.is_head or self.search_query:
+            for entry in self.visible_current_entries:
+                embed.add_field(
+                    name=f"{entry.decorated_name_id}", value=entry.description or "No description provided", inline=False
+                )
+
+            if len(self.visible_current_entries) == 0:
+                embed.add_field(
+                    name="No results" if self.search_query else "Nothing here yet!",
+                    value=(
+                        "We could not find any results for your query." if self.search_query else
+                        "There's nothing to show for now. Check back later!"
+                    ),
+                    inline=False
+                )
+
         # Show current selected entry
         if not self.is_head:
-            embed.title = f"{self._title} / {' / '.join(self.get_breadcrumbs(self._viewing))}"
-            embed.description = f"Viewing: {self._viewing.emoji} {self._viewing.name}"
+            if self._viewing:
+                embed.title = f"{self._title} / {' / '.join(self.get_breadcrumbs(self._viewing))}"
+                embed.description = f"Viewing: {self._viewing.emoji} {self._viewing.name}"
 
             if self._search:
                 embed.title = embed.title + ' / search'
-                embed.description = f"Searching: `{self._search}"
+                embed.description = f"Searching: `{self._search}`"
 
         # Render current selected entry info
         if self.is_leaf:
-            embed.description = f"# {self._viewing.emoji} {self._viewing.name}\n{self._viewing.description}"
+            embed.description = f"# {self._viewing.decorated_name}\n{self._viewing.description or 'No description provided'}"
 
             for field in self._viewing.fields:
                 embed.add_field(name=field.name, value=field.value, inline=False)
@@ -286,108 +330,132 @@ class ShinobuListDiscordView(ShinobuListBaseView):
 
     def _build_view(self) -> discord.ui.View:
         view: discord.ui.View = discord.ui.View(store=False)
+        current_row: int = 0
 
         # Add selection
-        if not self.is_head:
+        if not self.is_leaf:
             # Get items
             options: list[discord.SelectOption] = []
+            is_empty: bool = False
+
             for entry in self.visible_current_entries:
                 options.append(discord.SelectOption(
                     label=entry.name, value=entry.id, emoji=entry.emoji
                 ))
 
-            view.add_item(discord.ui.ActionRow(
-                discord.ui.Select(
-                    placeholder="Select an option...",
-                    custom_id="navigation_select",
-                    options=options,
-                    disabled=len(self.visible_current_entries) == 0
-                )
+            if len(options) == 0:
+                is_empty = True
+                options.append(discord.SelectOption(
+                    label="Placeholder option", value="placeholder"
+                ))
+
+            view.add_item(discord.ui.Select(
+                placeholder="Select an option...",
+                custom_id="navigation_select",
+                options=options,
+                disabled=is_empty,
+                row=current_row
             ))
+
+            current_row += 1
 
         # Add search options
         if self._search:
-            view.add_item(discord.ui.ActionRow(
+            self.add_items(view, [
                 discord.ui.Button(
                     label="By name",
                     style=discord.ButtonStyle.green if self._by_title else discord.ButtonStyle.gray,
                     disabled=self._use_both,
-                    custom_id="search_name"
+                    custom_id="search_name",
+                    row=current_row
                 ),
                 discord.ui.Button(
                     label="By description",
                     style=discord.ButtonStyle.green if self._by_desc else discord.ButtonStyle.gray,
                     disabled=self._use_both,
-                    custom_id="search_desc"
+                    custom_id="search_desc",
+                    row=current_row
                 ),
                 discord.ui.Button(
                     label="Match both" if self._use_both else "Match either",
                     style=discord.ButtonStyle.blurple if self._use_both else discord.ButtonStyle.gray,
-                    custom_id="search_both"
+                    custom_id="search_both",
+                    row=current_row
                 )
-            ))
+            ])
+
+            current_row += 1
 
         # Add navigation buttons
         if not self.is_leaf:
-            view.add_item(discord.ui.ActionRow(
+            self.add_items(view, [
                 discord.ui.Button(
                     emoji="\U000023EA",
                     custom_id="navigation_first",
                     style=discord.ButtonStyle.blurple,
-                    disabled=self._page==0
+                    disabled=self._page==0,
+                    row=current_row
                 ),
                 discord.ui.Button(
                     emoji="\U000025C0\U0000FE0F",
                     custom_id="navigation_previous",
                     style=discord.ButtonStyle.blurple,
-                    disabled=self._page == 0
+                    disabled=self._page == 0,
+                    row=current_row
                 ),
                 discord.ui.Button(
                     emoji="\U000025B6\U0000FE0F",
                     custom_id="navigation_next",
                     style=discord.ButtonStyle.blurple,
-                    disabled=self._page == self.max_page
+                    disabled=self._page == self.max_page,
+                    row=current_row
                 ),
                 discord.ui.Button(
                     emoji="\U000023E9",
                     custom_id="navigation_last",
                     style=discord.ButtonStyle.blurple,
-                    disabled=self._page == self.max_page
+                    disabled=self._page == self.max_page,
+                    row=current_row
                 ),
                 discord.ui.Button(
                     label="Search",
-                    emoji="\U000023EA",
+                    emoji="\U0001F50D",
                     custom_id="navigation_search",
                     style=discord.ButtonStyle.green,
-                    disabled=self._page == 0
+                    disabled=self.current_entries == 0,
+                    row=current_row
                 )
-            ))
+            ])
+
+            current_row += 1
 
         # Add back button
         if not self.is_head:
-            view.add_item(discord.ui.ActionRow(
-                discord.ui.Button(
-                    label="Back",
-                    emoji="\U00002B05\U0000FE0F",
-                    custom_id="navigation_back"
-                )
+            view.add_item(discord.ui.Button(
+                label="Back",
+                emoji="\U00002B05\U0000FE0F",
+                custom_id="navigation_back",
+                row=current_row
             ))
+
+            current_row += 1
 
         # Add hidden items toggle
         if self._allow_hidden:
-            view.add_item(discord.ui.ActionRow(
-                discord.ui.Button(
-                    label="Hide hidden items" if self._show_hidden else "Show hidden items",
-                    style=discord.ButtonStyle.gray,
-                    custom_id="navigation_hidden"
-                )
+            view.add_item(discord.ui.Button(
+                label="Hide hidden items" if self._show_hidden else "Show hidden items",
+                style=discord.ButtonStyle.gray,
+                custom_id="navigation_hidden",
+                row=current_row
             ))
+
+            current_row += 1
 
         return view
 
     @staticmethod
-    def _build_search() -> discord.ui.DesignerModal:
-        modal: discord.ui.DesignerModal = discord.ui.DesignerModal(
+    def _build_search() -> discord.ui.Modal:
+        modal: discord.ui.Modal = discord.ui.Modal(
             title="Search",
             custom_id="search_modal",
             store=False
@@ -409,17 +477,18 @@ class ShinobuListDiscordView(ShinobuListBaseView):
         view: discord.ui.View = self._build_view()
         return ShinobuListContent(embed=embed, view=view)
 
-    async def run(self, bot: bridge.Bot, initiator: discord.Interaction | commands.Context):
+    async def run(self, bot: bridge.Bot, initiator: discord.ApplicationContext | commands.Context):
         content: ShinobuListContent = self.render()
 
-        if isinstance(initiator, discord.Interaction):
+        if isinstance(initiator, discord.ApplicationContext):
             # Slash command
-            initiator_user: discord.User = initiator.user
-            message: discord.Message = (await initiator.response().send_message(
+            initiator_user: discord.User = initiator.interaction.user
+            returned: discord.Interaction = await initiator.interaction.response.send_message(
                 content=content.text,
                 embed=content.embed,
                 view=content.view
-            )).message
+            )
+            message: discord.InteractionMessage = await returned.original_response()
         else:
             # Text command
             initiator_user: discord.User = initiator.author
@@ -433,6 +502,8 @@ class ShinobuListDiscordView(ShinobuListBaseView):
         def check(incoming: discord.Interaction):
             return incoming.user.id == initiator_user.id and incoming.channel_id == initiator.channel_id
 
+        should_update: bool = True
+
         while True:
             try:
                 # noinspection PyUnresolvedReferences
@@ -443,7 +514,8 @@ class ShinobuListDiscordView(ShinobuListBaseView):
                 break
 
             # Get interaction response object
-            response: discord.InteractionResponse = interaction.response()
+            # (note: interaction.response causes type errors in my IDE so i'm using this instead)
+            response: discord.InteractionResponse = discord.InteractionResponse(interaction)
 
             if interaction.custom_id == "navigation_select":
                 # Select item
@@ -466,14 +538,15 @@ class ShinobuListDiscordView(ShinobuListBaseView):
                 self._page = self.max_page
             elif interaction.custom_id == "navigation_search":
                 # Launch search
-                modal: discord.ui.DesignerModal = self._build_search()
+                modal: discord.ui.Modal = self._build_search()
                 await response.send_modal(modal)
+                should_update = False
             elif interaction.custom_id == "navigation_hidden":
                 # Toggle hidden items
                 self.toggle_hidden()
             elif interaction.custom_id == "search_modal":
                 # Search submit
-                query: str = interaction.data["components"][0].get("value", None)
+                query: str = interaction.data["components"][0]["components"][0].get("value", None)
                 self.search(query)
             elif interaction.custom_id == "search_name":
                 # Search by title
@@ -489,16 +562,19 @@ class ShinobuListDiscordView(ShinobuListBaseView):
                     self._by_title = True
                     self._by_desc = True
 
-            # Display new content
-            new_content: ShinobuListContent = self.render()
+            if should_update:
+                # Display new content
+                new_content: ShinobuListContent = self.render()
 
-            if not response.is_done():
-                await response.edit_message(
-                    embed=new_content.embed,
-                    view=new_content.view
-                )
+                if not response.is_done():
+                    await response.edit_message(
+                        embed=new_content.embed,
+                        view=new_content.view
+                    )
+                else:
+                    await interaction.edit_original_response(
+                        embed=new_content.embed,
+                        view=new_content.view
+                    )
             else:
-                await interaction.edit_original_response(
-                    embed=new_content.embed,
-                    view=new_content.view
-                )
+                should_update = True

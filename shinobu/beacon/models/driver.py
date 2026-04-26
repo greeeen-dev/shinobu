@@ -139,6 +139,14 @@ class BeaconDriver:
         """Deletes a message."""
         raise BeaconDriverUnsupported()
 
+    async def _pin(self, message: beacon_message.BeaconMessage):
+        """Pins a message."""
+        raise BeaconDriverUnsupported()
+
+    async def _unpin(self, message: beacon_message.BeaconMessage):
+        """Unpins a message."""
+        raise BeaconDriverUnsupported()
+
     async def _purge(self, messages: list[beacon_message.BeaconMessage]):
         """Purges messages from a channel."""
         raise BeaconDriverUnsupported()
@@ -275,3 +283,23 @@ class BeaconDriver:
                 raise BeaconDriverChannelMismatch(channel_id, message.channel.id)
 
         return await self._purge(messages)
+
+    async def pin(self, message: beacon_message.BeaconMessage):
+        """Pins a message."""
+
+        # NOTE: You will need to overwrite BeaconDriver._pin for this to work.
+
+        if message.platform != self.platform:
+            raise BeaconDriverPlatformMismatch(message.platform)
+
+        return await self._pin(message)
+
+    async def unpin(self, message: beacon_message.BeaconMessage):
+        """Unpins a message."""
+
+        # NOTE: You will need to overwrite BeaconDriver._unpin for this to work.
+
+        if message.platform != self.platform:
+            raise BeaconDriverPlatformMismatch(message.platform)
+
+        return await self._unpin(message)

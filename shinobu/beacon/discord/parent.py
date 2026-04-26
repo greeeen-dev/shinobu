@@ -144,6 +144,9 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         results = await asyncio.gather(*tasks, return_exceptions=True)
         files: list[beacon_file.BeaconFile] = [result for result in results if type(result) is beacon_file.BeaconFile]
 
+        # Get pin status
+        is_pin: bool = message.type == discord.MessageType.pins_add
+
         # Assemble blocks
         blocks: dict[str, beacon_content.BeaconContentBlock] = {
             "content": text_content
@@ -162,7 +165,8 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             files=files,
             replies=replies,
             reply_content=self._driver.sanitize_outbound(reply_content) if reply_content else None,
-            reply_attachments=reply_attachments
+            reply_attachments=reply_attachments,
+            message_type=beacon_message.BeaconMessageType.pins_add if is_pin else None
         )
 
         return content
@@ -294,11 +298,53 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         except beacon.BeaconPlatformDisabled:
             pass
 
+    async def handle_pin(self, message: discord.Message):
+        # noinspection DuplicatedCode
+        origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+
+        # Get the BeaconMessage object for the message
+        message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
+        if not message_obj:
+            # We can't pin messages that aren't cached
+            return
+
+        # Convert guild data to server.BeaconServer
+        server: beacon_server.BeaconServer = origin_driver.get_server(str(message.guild.id))
+
+        # Convert channel data to channel.BeaconChannel
+        # noinspection DuplicatedCode
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+        if not channel:
+            # We can't bridge
+            return
+
+        # Get Space
+        space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
+
+        if not space:
+            # We can't bridge pins, even if it was sent in the Space by the server
+            return
+
+        # Pin the message!
+        try:
+            await self._beacon.pin(message=message_obj, unpin=not message.pinned)
+        except beacon.BeaconPlatformDisabled:
+            pass
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
-        # noinspection DuplicatedCode
+        supported_types: list[discord.MessageType] = [
+            discord.MessageType.default,
+            discord.MessageType.reply,
+            discord.MessageType.pins_add
+        ]
+        supported_types_community: list[discord.MessageType] = [
+            discord.MessageType.default,
+            discord.MessageType.reply
+        ]
+
         if message.content.startswith(self.bot.command_prefix):
             # Assume this is a text command
             return
@@ -307,6 +353,11 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             # Do not self-bridge
             return
 
+        if message.type not in supported_types:
+            # Unsupported message
+            return
+
+        # noinspection DuplicatedCode
         if message.webhook_id:
             # Check if the webhook was ours (to prevent a self-bridge)
             webhook: discord.Webhook | None = origin_driver.webhooks.get_webhook(str(message.webhook_id))
@@ -386,14 +437,38 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             pass
 
     @commands.Cog.listener()
-    async def on_message_edit(self, _, message: discord.Message):
+    async def on_message_edit(self, before: discord.Message, message: discord.Message):
+        # Identify update type
+        is_pin: bool = before.pinned != message.pinned
+
         # Check if message is pending
         if self._beacon.is_pending(str(message.id)):
             # Add callback
-            self._beacon.add_callback(str(message.id), self.handle_edit, [message])
+            if is_pin:
+                self._beacon.add_callback(str(message.id), self.handle_pin, [message])
+            else:
+                self._beacon.add_callback(str(message.id), self.handle_edit, [message])
         else:
             # Run directly
-            await self.handle_edit(message)
+            if is_pin:
+                await self.handle_pin(message)
+            else:
+                await self.handle_edit(message)
+
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent):
+        # Do not handle cached messages (on_message_edit does this for us)
+        if payload.cached_message:
+            return
+
+        # For uncached messages, we can only handle content edits for now. This may change in a future update
+        # Check if message is pending
+        if self._beacon.is_pending(str(payload.new_message.id)):
+            # Add callback
+            self._beacon.add_callback(str(payload.new_message.id), self.handle_edit, [payload.new_message])
+        else:
+            # Run directly
+            await self.handle_edit(payload.new_message)
 
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):

@@ -220,9 +220,10 @@ class Beacon:
                 private_owner_id=space_data.get("options", {}).get("private_owner_id"),
                 private_owner_platform=space_data.get("options", {}).get("private_owner_platform"),
                 nsfw=space_data.get("options", {}).get("nsfw"),
-                relay_deletes=space_data.get("options", {}).get("relay_deletes"),
-                relay_edits=space_data.get("options", {}).get("relay_edits"),
-                relay_large_attachments=space_data.get("options", {}).get("convert_large_files"),
+                relay_deletes=space_data.get("options", {}).get("relay_deletes", True),
+                relay_edits=space_data.get("options", {}).get("relay_edits", True),
+                relay_pins=space_data.get("options", {}).get("relay_pins", False),
+                relay_large_attachments=space_data.get("options", {}).get("convert_large_files", True),
                 compatibility=space_data.get("options", {}).get("compatibility"),
                 filters=space_data.get("options", {}).get("filters"),
                 filter_configs=space_data.get("options", {}).get("filter_configs")
@@ -549,6 +550,33 @@ class Beacon:
         else:
             await self._strategy_sequential(tasks)
 
+    async def _pin_platform(self, driver: beacon_driver.BeaconDriver,
+                            message_group: beacon_message.BeaconMessageGroup, original: beacon_message.BeaconMessage,
+                            unpin: bool = False):
+        platform_messages: list[beacon_message.BeaconMessage] = [
+            message for _, message in message_group.messages.items() if message.platform == driver.platform and
+                                                                        message.id != original.id
+        ]
+        tasks = []
+
+        for message in platform_messages:
+            if unpin:
+                task: BeaconCallback = BeaconCallback(
+                    driver.unpin,
+                    [message]
+                )
+            else:
+                task: BeaconCallback = BeaconCallback(
+                    driver.pin,
+                    [message]
+                )
+            tasks.append(task)
+
+        if driver.supports_async:
+            await self._strategy_async(tasks, return_exceptions=self.debug)
+        else:
+            await self._strategy_sequential(tasks)
+
     async def send(self, author: beacon_member.BeaconMember | beacon_member.BeaconPartialMember,
                    space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
                    webhook_id: str | None = None, preferred_name: str | None = None, preferred_avatar: str | None = None
@@ -689,6 +717,13 @@ class Beacon:
             return
 
         space: beacon_space.BeaconSpace = self.spaces.get_space(message_group.space_id)
+        if not space:
+            # We can't bridge
+            return
+
+        # Check if edit propagation is enabled
+        if not space.relay_edits:
+            return
 
         # Ensure we can send the message
         blocking_condition: BeaconMessageBlockedReason | None = await self.can_send(author, space, content)
@@ -726,7 +761,7 @@ class Beacon:
             tasks.append(task)
 
         # Bridge to platforms
-        await self._strategy_async(tasks, return_exceptions=self.debug)
+        await self._strategy_async(tasks, return_exceptions=not self.debug)
 
     async def delete(self, message: beacon_message.BeaconMessage):
         """Deletes a message sent to a Space."""
@@ -743,7 +778,17 @@ class Beacon:
             # We can't do anything with uncached messages
             return
 
-        # Edit message for each platform
+        # Get message space
+        space: beacon_space.BeaconSpace = self.spaces.get_space(message_group.space_id)
+        if not space:
+            # We can't bridge this
+            return
+
+        # Check if delete propagation is enabled
+        if not space.relay_deletes:
+            return
+
+        # Delete message for each platform
         tasks = []
         for platform in self._drivers.platforms:
             if platform in self._disabled_platforms:
@@ -757,7 +802,7 @@ class Beacon:
             tasks.append(task)
 
         # Bridge to platforms
-        await self._strategy_async(tasks, return_exceptions=self.debug)
+        await self._strategy_async(tasks, return_exceptions=not self.debug)
 
         # Remove message group from cache
         # noinspection PyTypeChecker
@@ -778,6 +823,16 @@ class Beacon:
             message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
             if not message_group:
                 # We can't do anything with uncached messages
+                continue
+
+            # Get message space
+            space: beacon_space.BeaconSpace = self.spaces.get_space(message_group.space_id)
+            if not space:
+                # We can't bridge this
+                continue
+
+            # Check if delete propagation is enabled
+            if not space.relay_deletes:
                 return
 
             message_groups.append(message_group)
@@ -796,9 +851,55 @@ class Beacon:
             tasks.append(task)
 
         # Bridge to platforms
-        await self._strategy_async(tasks, return_exceptions=self.debug)
+        await self._strategy_async(tasks, return_exceptions=not self.debug)
 
         # Remove message groups from cache
         for message_group in message_groups:
             # noinspection PyTypeChecker
             await self.__bot.loop.run_in_executor(None, lambda: self.messages.remove_message_group(message_group))
+
+    async def pin(self, message: beacon_message.BeaconMessage, unpin: bool = False):
+        """Pins a message sent to a Space."""
+
+        if not self.initialized:
+            raise BeaconNotInit()
+
+        if message.platform in self._disabled_platforms:
+            raise BeaconPlatformDisabled(message.platform)
+
+        # Get message group
+        message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
+        if not message_group:
+            # We can't do anything with uncached messages
+            return
+
+        # Get message space
+        space: beacon_space.BeaconSpace = self.spaces.get_space(message_group.space_id)
+        if not space:
+            # We can't bridge this
+            return
+
+        # Check if pin propagation is enabled
+        if not space.relay_pins:
+            return
+
+        # Pin message for each platform
+        tasks = []
+        for platform in self._drivers.platforms:
+            if platform in self._disabled_platforms:
+                continue
+
+            driver = self._drivers.get_driver(platform)
+            task: BeaconCallback = BeaconCallback(
+                self._pin_platform,
+                args=[driver, message_group, message],
+                kwargs={"unpin": unpin}
+            )
+            tasks.append(task)
+
+        # Bridge to platforms
+        await self._strategy_async(tasks, return_exceptions=not self.debug)
+
+    async def unpin(self, message: beacon_message.BeaconMessage):
+        """Unpins a message sent to a Space."""
+        return await self.pin(message, unpin=True)

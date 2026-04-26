@@ -155,8 +155,9 @@ class StoatBot(stoat_commands.Bot):
             spoiler=spoiler
         )
 
-    async def handle_edit(self, partial_message: stoat.PartialMessage):
-        message: stoat.Message = partial_message.channel.get_message(partial_message.id)
+    async def handle_edit(self, message: stoat.Message | stoat.PartialMessage):
+        if type(message) is stoat.PartialMessage:
+            message: stoat.Message = message.channel.get_message(message.id)
 
         if not message:
             # We can't do much here
@@ -202,7 +203,7 @@ class StoatBot(stoat_commands.Bot):
 
         # Convert message data to message.BeaconMessageContent
         content: beacon_message.BeaconMessageContent = await self._to_beacon_content(
-            partial_message, compatibility=space.compatibility
+            message, compatibility=space.compatibility
         )
 
         # Run preliminary checks
@@ -224,6 +225,39 @@ class StoatBot(stoat_commands.Bot):
                 message=message_obj,
                 content=content
             )
+        except beacon.BeaconPlatformDisabled:
+            pass
+
+    async def handle_pin(self, message: stoat.Message):
+        # noinspection DuplicatedCode
+        origin_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
+
+        # Get the BeaconMessage object for the message
+        message_obj: beacon_message.BeaconMessage = self._beacon.messages.get_message(str(message.id))
+        if not message_obj:
+            # We can't remove messages that aren't cached
+            return
+
+        # Convert guild data to server.BeaconServer
+        server: beacon_server.BeaconServer = origin_driver.get_server(str(message.server.id))
+
+        # Convert channel data to channel.BeaconChannel
+        # noinspection DuplicatedCode
+        channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, str(message.channel.id))
+        if not channel:
+            # We can't bridge
+            return
+
+        # Get Space
+        space: beacon_space.BeaconSpace = self._beacon.spaces.get_space_for_channel(channel)
+
+        if not space:
+            # We can't bridge deletes, even if it was sent in the Space by the server
+            return
+
+        # Pin the message!
+        try:
+            await self._beacon.pin(message=message_obj, unpin=not message.pinned)
         except beacon.BeaconPlatformDisabled:
             pass
 
@@ -350,15 +384,22 @@ class StoatBot(stoat_commands.Bot):
             pass
 
     async def on_message_update(self, event: stoat.MessageUpdateEvent):
-        partial_message: stoat.PartialMessage = event.message
+        message: stoat.Message = event.after
+        is_pin: bool = event.before.pinned != event.after.pinned
 
         # Check if message is pending
-        if self._beacon.is_pending(str(partial_message.id)):
+        if self._beacon.is_pending(str(message.id)):
             # Add callback
-            self._beacon.add_callback(str(partial_message.id), self.handle_edit, [partial_message])
+            if is_pin:
+                self._beacon.add_callback(str(message.id), self.handle_edit, [message])
+            else:
+                self._beacon.add_callback(str(message.id), self.handle_pin, [message])
         else:
             # Run directly
-            await self.handle_edit(partial_message)
+            if is_pin:
+                await self.handle_edit(message)
+            else:
+                await self.handle_pin(message)
 
     async def on_message_delete(self, event: stoat.MessageDeleteEvent):
         message: stoat.Message = event.message
