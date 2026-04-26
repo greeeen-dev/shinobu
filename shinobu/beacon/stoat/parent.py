@@ -21,6 +21,7 @@ import traceback
 import stoat
 from discord.ext import commands
 from stoat.ext import commands as stoat_commands, chunking
+from stoat.cache import _MEMBER_THROUGH_SERVER_GETTER
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.stoat import driver as stoat_driver
@@ -329,6 +330,10 @@ class StoatBot(stoat_commands.Bot):
 
         # Convert channel data to channel.BeaconChannel
         channel: beacon_channel.BeaconChannel = origin_driver.get_channel(server, message.channel.id)
+
+        if not server:
+            # We can't bridge to DMs
+            return
 
         if not author:
             # what
