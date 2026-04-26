@@ -447,7 +447,7 @@ class ShinobuListDiscordView(ShinobuListBaseView):
             current_row += 1
 
         # Add hidden items toggle
-        if self._allow_hidden:
+        if self._allow_hidden and not self.is_leaf:
             view.add_item(discord.ui.Button(
                 label="Hide hidden items" if self._show_hidden else "Show hidden items",
                 style=discord.ButtonStyle.gray,
