@@ -477,7 +477,11 @@ class ShinobuListDiscordView(ShinobuListBaseView):
         view: discord.ui.View = self._build_view()
         return ShinobuListContent(embed=embed, view=view)
 
-    async def run(self, bot: bridge.Bot, initiator: discord.ApplicationContext | commands.Context):
+    async def run(self, bot: bridge.Bot, initiator: discord.ApplicationContext | commands.Context,
+                  query: str | None = None):
+        if query:
+            self.search(query)
+
         content: ShinobuListContent = self.render()
 
         if isinstance(initiator, discord.ApplicationContext):

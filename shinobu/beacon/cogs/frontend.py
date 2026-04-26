@@ -74,7 +74,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
     @bridge_universal.command(name="spaces")
-    async def list_spaces(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str | None = None):
+    async def list_spaces(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, query: str | None = None):
         """Shows all available Spaces."""
 
         # Get driver
@@ -84,7 +84,8 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         list_ui: ui_kit.ShinobuListDiscordView = ui_kit.ShinobuListDiscordView(
             "Available Spaces",
             "Available Spaces",
-            self.bot.colors.shinobu
+            self.bot.colors.shinobu,
+            allow_hidden=ctx.user.id == self.bot.owner_id
         )
 
         # Add spaces
@@ -108,7 +109,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
             list_ui.add_entry(entry)
 
         # Run loop
-        await list_ui.run(self.bot, ctx)
+        await list_ui.run(self.bot, ctx, query=query)
 
     @bridge_universal.command(name="join-space")
     @commands.is_owner()
