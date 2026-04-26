@@ -19,28 +19,6 @@ class ShinobuListEntryField:
     def value(self) -> str:
         return self._value
 
-class ShinobuListAction:
-    def __init__(self, action: str, name: str, value = None):
-        self._action: str = action
-        self._name: str = name
-        self._value = value
-
-    @property
-    def action(self) -> str:
-        return self._action
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @property
-    def value(self):
-        return self._value
-
-    @value.setter
-    def value(self, new_value):
-        self._value = new_value
-
 class ShinobuListEntry:
     def __init__(self, entry_id: str, name: str, description: str | None = None, emoji: str | None = None,
                  hidden: bool = False):
@@ -52,7 +30,6 @@ class ShinobuListEntry:
         self._fields: list[ShinobuListEntryField] = []
         self._parent: ShinobuListEntry | None = None
         self._children: list[ShinobuListEntry] = []
-        self._actions: list[ShinobuListAction] = []
 
     @property
     def id(self) -> str:
@@ -99,9 +76,6 @@ class ShinobuListEntry:
 
     def add_field(self, name: str, value: str):
         self._fields.append(ShinobuListEntryField(name, value))
-
-    def add_action(self, action: str, name: str, value = None):
-        self._actions.append(ShinobuListAction(action, name, value=value))
 
     def set_parent(self, parent: 'ShinobuListEntry'):
         self._parent = parent

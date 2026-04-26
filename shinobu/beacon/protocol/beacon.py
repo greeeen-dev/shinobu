@@ -21,7 +21,8 @@ import uuid
 from enum import Enum
 from discord.ext import bridge
 from shinobu.beacon.protocol import (drivers as beacon_drivers, spaces as beacon_spaces, messages as beacon_messages,
-                                     filters as beacon_filters, pausing as beacon_pausing)
+                                     filters as beacon_filters, pausing as beacon_pausing, moderators as beacon_mods,
+                                     bans as beacon_bans)
 from shinobu.beacon.models import (space as beacon_space, message as beacon_message, content as beacon_content,
                                    filter as beacon_filter, member as beacon_member, channel as beacon_channel,
                                    driver as beacon_driver, server as beacon_server, user as beacon_user)
@@ -38,6 +39,10 @@ class BeaconNotInit(Exception):
 class BeaconPlatformDisabled(Exception):
     def __init__(self, platform: str):
         super().__init__(f"The resource is not available because {platform} is disabled.")
+
+class BeaconIsBanned(Exception):
+    def __init__(self, user_or_server: str):
+        super().__init__(f"This action cannot be done as {user_or_server} is banned.")
 
 class BeaconCallback:
     def __init__(self, func, args: list | None = None, kwargs: dict | None = None):
@@ -91,6 +96,8 @@ class Beacon:
         self._messages: beacon_messages.BeaconMessageCache = beacon_messages.BeaconMessageCache(self.__wrapper)
         self._filters: beacon_filters.BeaconFilterManager = beacon_filters.BeaconFilterManager()
         self._pausing: beacon_pausing.BeaconPauseManager = beacon_pausing.BeaconPauseManager()
+        self._moderators: beacon_mods.BeaconModManager = beacon_mods.BeaconModManager()
+        self._bans: beacon_bans.BeaconBanManager = beacon_bans.BeaconBanManager()
 
     @property
     def initialized(self) -> bool:
@@ -111,6 +118,14 @@ class Beacon:
     @property
     def messages(self) -> beacon_messages.BeaconMessageCache:
         return self._messages
+
+    @property
+    def moderators(self) -> beacon_mods.BeaconModManager:
+        return self._moderators
+
+    @property
+    def bans(self) -> beacon_bans.BeaconBanManager:
+        return self._bans
 
     @property
     def disabled_platforms(self) -> list[str]:
@@ -333,6 +348,33 @@ class Beacon:
 
             self.messages.add_message(group)
 
+        # Load moderators
+        if data.get("moderators"):
+            for _, mod_data in data["moderators"].get("moderators", {}).items():
+                moderator: beacon_mods.BeaconModerator = beacon_mods.BeaconModerator(
+                    user_id=mod_data["id"],
+                    platform=mod_data["platform"]
+                )
+                self.moderators.add_moderator(moderator)
+
+            for _, admin_data in data["moderators"].get("admins", {}).items():
+                admin: beacon_mods.BeaconAdmin = beacon_mods.BeaconAdmin(
+                    user_id=admin_data["id"],
+                    platform=admin_data["platform"]
+                )
+                self.moderators.add_admin(admin)
+
+        # Load bans
+        for ban_id, ban_data in data.get("bans", {}).items():
+            ban: beacon_bans.BeaconBan = beacon_bans.BeaconBan(
+                user_id=ban_id,
+                ban_type=ban_data.get("type", 0),
+                platform=ban_data.get("platform"),
+                expiry=ban_data.get("expiry")
+            )
+
+            self.bans.add_ban(ban)
+
         self._init = True
 
         # Add shutdown cleanup
@@ -350,6 +392,8 @@ class Beacon:
         # Assemble data dict
         data: dict = {
             "spaces": self._spaces.to_dict(),
+            "moderators": self._moderators.to_dict(),
+            "bans": self._bans.to_dict(),
             "paused": self._pausing.to_dict(),
             "raw": self._data
         }
@@ -589,6 +633,14 @@ class Beacon:
         if content.original_platform in self._disabled_platforms:
             raise BeaconPlatformDisabled(content.original_platform)
 
+        # Ensure user is not banned
+        if self.bans.is_banned(author):
+            raise BeaconIsBanned(author.id)
+
+        # Ensure server is not banned
+        if self.bans.is_banned(author.server):
+            raise BeaconIsBanned(author.server_id)
+
         # Ensure content is not empty
         if len(content.blocks) == 0 and len(content.files) == 0:
             return
@@ -704,6 +756,14 @@ class Beacon:
         if content.original_platform in self._disabled_platforms:
             raise BeaconPlatformDisabled(content.original_platform)
 
+        # Ensure user is not banned
+        if self.bans.is_banned(message.author):
+            raise BeaconIsBanned(message.author.id)
+
+        # Ensure server is not banned
+        if self.bans.is_banned(message.server):
+            raise BeaconIsBanned(message.server.id)
+
         origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(message.platform)
 
         # Get message metadata
@@ -772,6 +832,10 @@ class Beacon:
         if message.platform in self._disabled_platforms:
             raise BeaconPlatformDisabled(message.platform)
 
+        # Ensure server is not banned
+        if self.bans.is_banned(message.server):
+            raise BeaconIsBanned(message.server.id)
+
         # Get message group
         message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
         if not message_group:
@@ -817,6 +881,10 @@ class Beacon:
         if messages[0].platform in self._disabled_platforms:
             raise BeaconPlatformDisabled(messages[0].platform)
 
+        # Ensure server is not banned
+        if self.bans.is_banned(messages[0].server):
+            raise BeaconIsBanned(messages[0].server.id)
+
         # Get message groups
         message_groups: list[beacon_message.BeaconMessageGroup] = []
         for message in messages:
@@ -859,13 +927,21 @@ class Beacon:
             await self.__bot.loop.run_in_executor(None, lambda: self.messages.remove_message_group(message_group))
 
     async def pin(self, message: beacon_message.BeaconMessage, unpin: bool = False):
-        """Pins a message sent to a Space."""
+        """Pins or unpins a message sent to a Space."""
 
         if not self.initialized:
             raise BeaconNotInit()
 
         if message.platform in self._disabled_platforms:
             raise BeaconPlatformDisabled(message.platform)
+
+        # Ensure user is not banned
+        if self.bans.is_banned(message.author):
+            raise BeaconIsBanned(message.author.id)
+
+        # Ensure server is not banned
+        if self.bans.is_banned(message.server):
+            raise BeaconIsBanned(message.server.id)
 
         # Get message group
         message_group: beacon_message.BeaconMessageGroup = self.messages.get_group_from_message(message.id)
@@ -901,5 +977,6 @@ class Beacon:
         await self._strategy_async(tasks, return_exceptions=not self.debug)
 
     async def unpin(self, message: beacon_message.BeaconMessage):
-        """Unpins a message sent to a Space."""
+        """Unpins a message sent to a Space.
+        Shorthand for Beacon.pin(message, unpin=True)"""
         return await self.pin(message, unpin=True)

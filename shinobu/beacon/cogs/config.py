@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import discord
-from discord.ext import commands, bridge
+from discord.ext import bridge
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.protocol import beacon
 
