@@ -100,6 +100,9 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         print("Shinobu Runtime is ready! :3")
         print(f"Logged in as {self.bot.user.name}#{self.bot.user.discriminator} ({self.bot.user.id})")
 
+        # Eager load owner info
+        await self.bot.is_owner(self.bot.user)
+
         # Handle restart
         if self.bot.restart_message_id:
             channel: discord.TextChannel | None = self.bot.get_channel(self.bot.restart_message_channel_id)
