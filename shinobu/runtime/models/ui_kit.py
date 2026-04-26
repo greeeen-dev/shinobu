@@ -345,7 +345,8 @@ class ShinobuListDiscordView(ShinobuListBaseView):
 
             for entry in self.visible_current_entries:
                 options.append(discord.SelectOption(
-                    label=entry.name, value=entry.id, emoji=entry.emoji
+                    label=entry.name, value=entry.id, emoji=entry.emoji,
+                    description=entry.description or "No description provided"
                 ))
 
             if len(options) == 0:
