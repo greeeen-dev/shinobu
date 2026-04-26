@@ -400,15 +400,15 @@ class StoatBot(stoat_commands.Bot):
         if self._beacon.is_pending(str(message.id)):
             # Add callback
             if is_pin:
-                self._beacon.add_callback(str(message.id), self.handle_edit, [message])
-            else:
                 self._beacon.add_callback(str(message.id), self.handle_pin, [message])
+            else:
+                self._beacon.add_callback(str(message.id), self.handle_edit, [message])
         else:
             # Run directly
             if is_pin:
-                await self.handle_edit(message)
-            else:
                 await self.handle_pin(message)
+            else:
+                await self.handle_edit(message)
 
     async def on_message_delete(self, event: stoat.MessageDeleteEvent):
         message: stoat.Message = event.message
