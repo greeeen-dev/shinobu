@@ -305,8 +305,11 @@ class BeaconSpace:
 
         invite_entry.use_invite()
 
-    def is_banned(self, server: beacon_server.BeaconServer):
-        return server.id in self._bans
+    def is_banned(self, server: beacon_server.BeaconServer | str):
+        if isinstance(server, beacon_server.BeaconServer):
+            server = server.id
+
+        return server in self._bans
 
     def join(self, server: beacon_server.BeaconServer, channel: beacon_channel.BeaconChannel,
              webhook: beacon_webhook.BeaconWebhook | str | None = None, invite: BeaconSpaceInvite | None = None,
@@ -385,17 +388,40 @@ class BeaconSpace:
         # Join space
         self._partial_members.append(new_membership)
 
-    def leave(self, member: BeaconSpaceMember):
-        if member not in self._members:
-            raise BeaconSpaceNotJoined("Server is not in this Space")
-
-        self._members.remove(member)
+    def leave(self, member: BeaconSpaceMember | BeaconPartialSpaceMember):
+        # We'll only remove a full member if the type of member is BeaconSpaceMember
+        # Otherwise, we can only assume a partial join and skip this
+        if member in self._members and isinstance(member, BeaconSpaceMember):
+            self._members.remove(member)
 
         # Remove member from partial members as well
-        for partial_member in self._partial_members:
-            if partial_member.server_id == member.server_id:
-                self._partial_members.remove(partial_member)
-                break
+        if isinstance(member, BeaconPartialSpaceMember):
+            self._partial_members.remove(member)
+        else:
+            has_removed: bool = False
+
+            for partial_member in self._partial_members:
+                if partial_member.server_id == member.server_id:
+                    self._partial_members.remove(partial_member)
+                    has_removed = True
+                    break
+
+            if not has_removed:
+                raise BeaconSpaceNotJoined("Server is not in this Space")
+
+    def ban(self, member: BeaconSpaceMember | BeaconPartialSpaceMember | str):
+        if isinstance(member, BeaconSpaceMember) or isinstance(member, BeaconPartialSpaceMember):
+            try:
+                self.leave(member)
+            except (BeaconSpaceNotJoined, ValueError):
+                pass
+
+            self._bans.append(member.server_id)
+        else:
+            self._bans.append(member)
+
+    def unban(self, server_id: str):
+        self._bans.remove(server_id)
     
     def get_member(self, server: beacon_server.BeaconServer) -> BeaconSpaceMember | None:
         """Gets a Space member."""
@@ -409,9 +435,24 @@ class BeaconSpace:
 
         return None
 
+    def get_partial_member(self, server: beacon_server.BeaconServer | str) -> BeaconPartialSpaceMember | None:
+        """Gets a Space member."""
+
+        if isinstance(server, beacon_server.BeaconServer):
+            server = server.id
+
+        filtered_members: list[BeaconPartialSpaceMember] = [
+            member for member in self._partial_members if member.server_id == server
+        ]
+
+        if len(filtered_members) > 0:
+            return filtered_members[0]
+
+        return None
+
     def has_access(self, server: beacon_server.BeaconServer) -> bool:
         # Check for membership
-        has_membership: bool = self.get_member(server) is not None
+        has_membership: bool = self.get_partial_member(server) is not None
 
         # Check for ownership
         has_ownership: bool = server.id == self.private_owner_id
