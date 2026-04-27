@@ -117,6 +117,9 @@ class BeaconPairing(shinobu_cog.ShinobuCog):
                     ),
                     color=self.bot.colors.shinobu
                 )
+                embed.set_footer(
+                    text="NOTE: This does not establish a bridge between a paired server."
+                )
                 await ctx.author.send(embed=embed)
             except discord.HTTPException:
                 self._beacon.pairing.revoke_pairing_code(code)
