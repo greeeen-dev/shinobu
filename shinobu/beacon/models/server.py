@@ -16,15 +16,18 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from shinobu.beacon.models import abc
+from shinobu.beacon.models import abc, emoji as beacon_emoji
 
 class BeaconServer(abc.BeaconABC):
     """A class representing a server."""
 
-    def __init__(self, server_id: str, platform: str, name: str, filesize_limit: int | None = None):
+    def __init__(self, server_id: str, platform: str, name: str, filesize_limit: int | None = None,
+                 emojis: list[beacon_emoji.BeaconEmoji] | None = None):
         super().__init__(server_id, platform)
         self._name: str = name
         self._filesize_limit: int | None = filesize_limit
+        self._emojis: list[beacon_emoji.BeaconEmoji] = emojis or []
+        self._pairing: str | None = None
 
     @property
     def name(self) -> str:
@@ -33,6 +36,21 @@ class BeaconServer(abc.BeaconABC):
     @property
     def filesize_limit(self) -> int | None:
         return self._filesize_limit
+
+    @property
+    def emojis(self) -> list[beacon_emoji.BeaconEmoji]:
+        return self._emojis
+
+    @property
+    def pairing(self) -> str | None:
+        return self._pairing
+
+    def pair(self, pair_id: str):
+        """Pairs a server with a pairing group."""
+        self._pairing = pair_id
+
+    def unpair(self):
+        self._pairing = None
 
     def __eq__(self, other):
         if not isinstance(other, BeaconServer):

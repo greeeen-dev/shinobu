@@ -21,7 +21,7 @@ from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
                                    member as beacon_member, channel as beacon_channel, message as beacon_message,
                                    messageable as beacon_messageable, content as beacon_content, file as beacon_file,
-                                   webhook as beacon_webhook)
+                                   webhook as beacon_webhook, emoji as beacon_emoji)
 
 class FluxerMessageContent:
     def __init__(self, content: str | None = None, files: list[fluxer.File] | None = None,
@@ -129,10 +129,15 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         return None
 
     def _to_beacon_server(self, server: fluxer.Guild) -> beacon_server.BeaconServer:
+        emojis: list[beacon_emoji.BeaconEmoji] = []
+        for emoji in server.emojis:
+            emojis.append(self._to_beacon_emoji(emoji))
+
         return beacon_server.BeaconServer(
             server_id=str(server.id),
             platform=self.platform,
-            name=server.name
+            name=server.name,
+            emojis=emojis
         )
 
     def _to_beacon_channel(self, channel: fluxer.Channel) -> beacon_channel.BeaconChannel:
@@ -202,8 +207,18 @@ class FluxerDriver(beacon_driver.BeaconDriver):
             channel=channel
         )
 
+    def _to_beacon_emoji(self, emoji: fluxer.Emoji) -> beacon_emoji.BeaconEmoji:
+        return beacon_emoji.BeaconEmoji(
+            emoji_id=str(emoji.id),
+            platform=self.platform,
+            name=emoji.name,
+            server_id=str(emoji.guild_id),
+            animated=emoji.animated
+        )
+
     async def _to_fluxer_content(self, content: beacon_message.BeaconMessageContent,
-                                 destination: beacon_messageable.BeaconMessageable) -> FluxerMessageContent:
+                                 destination: beacon_messageable.BeaconMessageable,
+                                 emoji_mapping: dict | None = None) -> FluxerMessageContent:
         # Content
         embeds: list[fluxer.Embed] = []
         replies: list[fluxer.Message] = []
@@ -266,9 +281,13 @@ class FluxerDriver(beacon_driver.BeaconDriver):
             elif isinstance(block_obj, beacon_content.BeaconContentEmbed):
                 embeds.append(FluxerBeaconContentBlockConverter.embed(block_obj))
 
+        joined_text: str = "\n".join(text_components)
+        if emoji_mapping:
+            joined_text = self.apply_emoji_mapping(joined_text, emoji_mapping)
+
         # Assemble to FluxerMessageContent
         return FluxerMessageContent(
-            content=self.sanitize_inbound("\n".join(text_components)),
+            content=self.sanitize_inbound(joined_text),
             files=files,
             embeds=embeds,
             replies=replies
@@ -396,7 +415,8 @@ class FluxerDriver(beacon_driver.BeaconDriver):
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
                    webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False,
-                   preferred_name: str | None = None, preferred_avatar: str | None = None):
+                   preferred_name: str | None = None, preferred_avatar: str | None = None,
+                   emoji_mapping: dict | None = None):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None
@@ -429,7 +449,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
         # Convert message content data
         fluxer_content: FluxerMessageContent = await self._to_fluxer_content(
-            content, destination
+            content, destination, emoji_mapping=emoji_mapping
         )
 
         # Convert bot user to BeaconUser

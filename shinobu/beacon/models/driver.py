@@ -125,13 +125,13 @@ class BeaconDriver:
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
                    webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False,
-                   preferred_name: str | None = None, preferred_avatar: str | None = None
-                   ) -> beacon_message.BeaconMessage:
+                   preferred_name: str | None = None, preferred_avatar: str | None = None,
+                   emoji_mapping: dict | None = None) -> beacon_message.BeaconMessage:
         """Sends a message to a given destination."""
         raise BeaconDriverUnsupported()
 
     async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
-                    compatibility: bool = False):
+                    compatibility: bool = False, emoji_mapping: dict | None = None):
         """Edits a message."""
         raise BeaconDriverUnsupported()
 
@@ -165,6 +165,15 @@ class BeaconDriver:
 
     def sanitize_outbound_compat(self, content: str) -> str:
         """Sanitizes content to be friendly with driver's platform with compatibility mode enabled."""
+        return content
+
+    @staticmethod
+    def apply_emoji_mapping(content: str, emoji_mapping: dict) -> str:
+        """Applies emoji mappings for paired servers."""
+
+        for emoji, replacement in emoji_mapping.items():
+            content = content.replace(emoji, replacement)
+
         return content
 
     # The following properties and methods are already implemented but can be overwritten
@@ -243,7 +252,7 @@ class BeaconDriver:
             return self._file_limit
 
     async def edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
-                   compatibility: bool = False):
+                   compatibility: bool = False, emoji_mapping: dict | None = None):
         """Edits a message."""
 
         # NOTE: You will need to overwrite BeaconDriver._edit for this to work.
@@ -254,7 +263,7 @@ class BeaconDriver:
         # Update message content
         message.edit_content(content.to_plaintext())
 
-        return await self._edit(message, content, compatibility=compatibility)
+        return await self._edit(message, content, compatibility=compatibility, emoji_mapping=emoji_mapping)
 
     async def delete(self, message: beacon_message.BeaconMessage):
         """Deletes a message."""

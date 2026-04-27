@@ -23,7 +23,8 @@ from stoat.ext import commands
 from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
                                    member as beacon_member, channel as beacon_channel, message as beacon_message,
-                                   messageable as beacon_messageable, content as beacon_content, file as beacon_file)
+                                   messageable as beacon_messageable, content as beacon_content, file as beacon_file,
+                                   emoji as beacon_emoji)
 from shinobu.beacon.stoat.models import embed as stoat_embed
 
 class StoatMessageContent:
@@ -105,10 +106,15 @@ class StoatDriver(beacon_driver.BeaconDriver):
         self._supports_agegate = True
 
     def _to_beacon_server(self, server: stoat.Server) -> beacon_server.BeaconServer:
+        emojis: list[beacon_emoji.BeaconEmoji] = []
+        for emoji in server.emojis:
+            emojis.append(self._to_beacon_emoji(server.get_emoji(emoji)))
+
         return beacon_server.BeaconServer(
             server_id=str(server.id),
             platform=self.platform,
-            name=server.name
+            name=server.name,
+            emojis=emojis
         )
 
     def _to_beacon_channel(self, channel: stoat.ServerChannel) -> beacon_channel.BeaconChannel:
@@ -164,9 +170,19 @@ class StoatDriver(beacon_driver.BeaconDriver):
             webhook_id=None
         )
 
+    def _to_beacon_emoji(self, emoji: stoat.Emoji) -> beacon_emoji.BeaconEmoji:
+        return beacon_emoji.BeaconEmoji(
+            emoji_id=emoji.id,
+            platform=self.platform,
+            name=emoji.name,
+            server_id=emoji.server_id,
+            emoji_text=f":{emoji.id}:",
+            animated=emoji.animated
+        )
+
     async def _to_stoat_content(self, content: beacon_message.BeaconMessageContent,
-                                destination: beacon_messageable.BeaconMessageable, compatibility: bool = False
-                                ) -> StoatMessageContent:
+                                destination: beacon_messageable.BeaconMessageable, compatibility: bool = False,
+                                emoji_mapping: dict | None = None) -> StoatMessageContent:
         # Content
         embeds: list[stoat_embed.Embed] = []
         replies: list[stoat.Message | stoat.Reply] = []
@@ -208,8 +224,12 @@ class StoatDriver(beacon_driver.BeaconDriver):
                     icon_url=reply_message.author.avatar_url if reply_message.author else None
                 ))
 
+        joined_text: str = "\n".join(text_components)
+        if emoji_mapping:
+            joined_text = self.apply_emoji_mapping(joined_text, emoji_mapping)
+
         # Get final content
-        final_content: str = self.sanitize_inbound("\n".join(text_components))
+        final_content: str = self.sanitize_inbound(joined_text)
 
         if compatibility:
             final_content = self.sanitize_inbound_compat(final_content)
@@ -394,7 +414,8 @@ class StoatDriver(beacon_driver.BeaconDriver):
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
                    webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False,
-                   preferred_name: str | None = None, preferred_avatar: str | None = None):
+                   preferred_name: str | None = None, preferred_avatar: str | None = None,
+                   emoji_mapping: dict | None = None):
         # Get message options
         send_as_user: bool = send_as is not None
 
@@ -413,7 +434,9 @@ class StoatDriver(beacon_driver.BeaconDriver):
             custom_avatar = preferred_avatar
 
         # Convert message content data
-        stoat_content: StoatMessageContent = await self._to_stoat_content(content, destination, compatibility=compatibility)
+        stoat_content: StoatMessageContent = await self._to_stoat_content(
+            content, destination, compatibility=compatibility, emoji_mapping=emoji_mapping
+        )
 
         # Convert bot user to BeaconUser
         self_user = self.get_user(self.bot.user.id)
@@ -476,12 +499,14 @@ class StoatDriver(beacon_driver.BeaconDriver):
         )
 
     async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
-                    compatibility: bool = False):
+                    compatibility: bool = False, emoji_mapping: dict | None = None):
         channel = self.bot.get_channel(message.channel.id)
         message_obj = await channel.fetch_message(message.id)
 
         # Convert message content data
-        stoat_content: StoatMessageContent = await self._to_stoat_content(content, destination=message.channel, compatibility=compatibility)
+        stoat_content: StoatMessageContent = await self._to_stoat_content(
+            content, destination=message.channel, compatibility=compatibility, emoji_mapping=emoji_mapping
+        )
 
         # Edit message
         await message_obj.edit(

@@ -25,7 +25,7 @@ from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
                                    member as beacon_member, channel as beacon_channel, webhook as beacon_webhook,
                                    message as beacon_message, messageable as beacon_messageable,
-                                   content as beacon_content, file as beacon_file)
+                                   content as beacon_content, file as beacon_file, emoji as beacon_emoji)
 
 class DiscordMessageContent:
     def __init__(self, content: str | None = None, components: discord.ui.DesignerView | discord.ui.View | None = None,
@@ -208,11 +208,16 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         self._use_components_v2: bool = True
 
     def _to_beacon_server(self, guild: discord.Guild) -> beacon_server.BeaconServer:
+        emojis: list[beacon_emoji.BeaconEmoji] = []
+        for emoji in guild.emojis:
+            emojis.append(self._to_beacon_emoji(emoji))
+
         return beacon_server.BeaconServer(
             server_id=str(guild.id),
             platform=self.platform,
             name=guild.name,
-            filesize_limit=guild.filesize_limit
+            filesize_limit=guild.filesize_limit,
+            emojis=emojis
         )
 
     def _to_beacon_channel(self, channel: discord.TextChannel) -> beacon_channel.BeaconChannel:
@@ -279,8 +284,19 @@ class DiscordDriver(beacon_driver.BeaconDriver):
             channel=channel
         )
 
+    def _to_beacon_emoji(self, emoji: discord.Emoji) -> beacon_emoji.BeaconEmoji:
+        return beacon_emoji.BeaconEmoji(
+            emoji_id=str(emoji.id),
+            platform=self.platform,
+            name=emoji.name,
+            server_id=str(emoji.guild_id),
+            emoji_text=emoji.mention,
+            animated=emoji.animated
+        )
+
     async def _to_discord_content(self, content: beacon_message.BeaconMessageContent,
-                                  destination: beacon_messageable.BeaconMessageable, use_components_v2: bool | None = None
+                                  destination: beacon_messageable.BeaconMessageable,
+                                  use_components_v2: bool | None = None, emoji_mapping: dict | None = None
                                   ) -> DiscordMessageContent:
         if use_components_v2 is None:
             use_components_v2 = self._use_components_v2
@@ -464,15 +480,23 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 components.add_item(container_block)
                 current_container_id += 1
 
+            joined_text: str = "\n".join(text_components)
+            if emoji_mapping:
+                joined_text = self.apply_emoji_mapping(joined_text, emoji_mapping)
+
             return DiscordMessageContent(
-                content=self.sanitize_inbound("\n".join(text_components)),
+                content=self.sanitize_inbound(joined_text),
                 components=components,
                 files=file_block_files
             )
         else:
             # Use Components v1
+            joined_text: str = "\n".join(text_components)
+            if emoji_mapping:
+                joined_text = self.apply_emoji_mapping(joined_text, emoji_mapping)
+
             return DiscordMessageContent(
-                content=self.sanitize_inbound("\n".join(text_components)),
+                content=self.sanitize_inbound(joined_text),
                 files=files,
                 embeds=legacy_embeds,
                 components=legacy_reply_components
@@ -613,7 +637,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
     async def send(self, destination: beacon_messageable.BeaconMessageable,
                    content: beacon_message.BeaconMessageContent, send_as: beacon_user.BeaconUser | None = None,
                    webhook_id: str | None = None, self_send: bool = False, compatibility: bool = False,
-                   preferred_name: str | None = None, preferred_avatar: str | None = None):
+                   preferred_name: str | None = None, preferred_avatar: str | None = None,
+                   emoji_mapping: dict | None = None):
         # Get message options
         send_as_webhook: bool = webhook_id is not None
         send_as_user: bool = send_as is not None
@@ -722,12 +747,12 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         )
 
     async def _edit(self, message: beacon_message.BeaconMessage, content: beacon_message.BeaconMessageContent,
-                    compatibility: bool = False):
+                    compatibility: bool = False, emoji_mapping: dict | None = None):
         channel = self.bot.get_channel(int(message.channel.id))
 
         # Convert message content data
         discord_content: DiscordMessageContent = await self._to_discord_content(
-            content, destination=message.channel, use_components_v2=self._use_components_v2
+            content, destination=message.channel, use_components_v2=self._use_components_v2, emoji_mapping=emoji_mapping
         )
 
         # Do not try to edit the author's message

@@ -82,7 +82,6 @@ class BeaconBanManager:
     @property
     def bans(self) -> list[BeaconBan]:
         return list(self._bans.values())
-        return list(self._admins.values())
 
     def add_ban(self, ban: BeaconBan):
         """Adds a Beacon ban."""

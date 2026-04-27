@@ -22,7 +22,7 @@ from enum import Enum
 from discord.ext import bridge
 from shinobu.beacon.protocol import (drivers as beacon_drivers, spaces as beacon_spaces, messages as beacon_messages,
                                      filters as beacon_filters, pausing as beacon_pausing, moderators as beacon_mods,
-                                     bans as beacon_bans)
+                                     bans as beacon_bans, pairing as beacon_pairing)
 from shinobu.beacon.models import (space as beacon_space, message as beacon_message, content as beacon_content,
                                    filter as beacon_filter, member as beacon_member, channel as beacon_channel,
                                    driver as beacon_driver, server as beacon_server, user as beacon_user)
@@ -98,6 +98,7 @@ class Beacon:
         self._pausing: beacon_pausing.BeaconPauseManager = beacon_pausing.BeaconPauseManager()
         self._moderators: beacon_mods.BeaconModManager = beacon_mods.BeaconModManager()
         self._bans: beacon_bans.BeaconBanManager = beacon_bans.BeaconBanManager()
+        self._pairing: beacon_pairing.BeaconPairingManager = beacon_pairing.BeaconPairingManager()
 
     @property
     def initialized(self) -> bool:
@@ -126,6 +127,10 @@ class Beacon:
     @property
     def bans(self) -> beacon_bans.BeaconBanManager:
         return self._bans
+
+    @property
+    def pairing(self) -> beacon_pairing.BeaconPairingManager:
+        return self._pairing
 
     @property
     def disabled_platforms(self) -> list[str]:
@@ -375,6 +380,21 @@ class Beacon:
 
             self.bans.add_ban(ban)
 
+        # Load server pairings
+        for pair_id, pair_data in data.get("pairing", {}).items():
+            pairing: beacon_pairing.BeaconPairing = beacon_pairing.BeaconPairing(group_id=pair_id)
+
+            for paired_server in pair_data.get("servers", []):
+                server_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(paired_server.get("platform"))
+
+                if not server_driver and paired_server.get("id") and paired_server.get("platform"):
+                    pairing.add_partial_server(paired_server.get("id"), paired_server.get("platform"))
+                else:
+                    paired_server_obj: beacon_server.BeaconServer = server_driver.get_server(paired_server.get("id"))
+                    pairing.add_server(paired_server_obj)
+
+            self.pairing.add_pairing(pairing)
+
         self._init = True
 
         # Add shutdown cleanup
@@ -395,6 +415,7 @@ class Beacon:
             "moderators": self._moderators.to_dict(),
             "bans": self._bans.to_dict(),
             "paused": self._pausing.to_dict(),
+            "pairing": self._pairing.to_dict(),
             "raw": self._data
         }
 
@@ -482,21 +503,28 @@ class Beacon:
 
     async def _send_platform(self, driver: beacon_driver.BeaconDriver, author: beacon_member.BeaconMember,
                              space: beacon_space.BeaconSpace, content: beacon_message.BeaconMessageContent,
-                             preferred_name: str | None, preferred_avatar: str | None, self_send: bool = False
-                             ) -> list[beacon_message.BeaconMessage]:
+                             preferred_name: str | None, preferred_avatar: str | None, self_send: bool = False,
+                             emoji_mapping: dict | None = None) -> list[beacon_message.BeaconMessage]:
         space_members: list[beacon_space.BeaconSpaceMember] = [
             member for member in space.members if member.platform == driver.platform
         ]
         tasks: list[BeaconCallback] = []
 
         for member in space_members:
+            # Get emoji mappings
+            local_emoji_mapping: dict | None = None
+            if emoji_mapping:
+                for emoji_name in emoji_mapping:
+                    if member.server_id in emoji_mapping[emoji_name]:
+                        local_emoji_mapping.update({emoji_name, emoji_mapping[emoji_name][member.server_id].name})
+
             task: BeaconCallback = BeaconCallback(
                 driver.send,
                 [member.channel, content],
                 {
                     "send_as": author, "webhook_id": member.webhook_id, "self_send": self_send,
                     "compatibility": space.compatibility, "preferred_name": preferred_name,
-                    "preferred_avatar": preferred_avatar
+                    "preferred_avatar": preferred_avatar, "emoji_mapping": local_emoji_mapping
                 }
             )
             tasks.append(task)
@@ -519,7 +547,7 @@ class Beacon:
         return results
 
     async def _edit_platform(self, driver: beacon_driver.BeaconDriver, message_group: beacon_message.BeaconMessageGroup,
-                             content: beacon_message.BeaconMessageContent):
+                             content: beacon_message.BeaconMessageContent, emoji_mapping: dict | None = None):
         platform_messages: list[beacon_message.BeaconMessage] = [
             message for _, message in message_group.messages.items() if message.platform == driver.platform and message.id != content.original_id
         ]
@@ -532,10 +560,17 @@ class Beacon:
             compatibility = space.compatibility
 
         for message in platform_messages:
+            # Get emoji mappings
+            local_emoji_mapping: dict | None = None
+            if emoji_mapping:
+                for emoji_name in emoji_mapping:
+                    if message.server.id in emoji_mapping[emoji_name]:
+                        local_emoji_mapping.update({emoji_name, emoji_mapping[emoji_name][message.server.id].name})
+
             task: BeaconCallback = BeaconCallback(
                 driver.edit,
                 [message, content],
-                {"compatibility": compatibility}
+                {"compatibility": compatibility, "emoji_mapping": local_emoji_mapping}
             )
             tasks.append(task)
 
@@ -670,6 +705,12 @@ class Beacon:
         ):
             raise ValueError("Age gate mismatch.")
 
+        # Get emoji mapping
+        emoji_mapping: dict | None = None
+        if author.server.pairing:
+            pairing: beacon_pairing.BeaconPairing = self.pairing.get_pairing(author.server.pairing)
+            emoji_mapping = pairing.get_matches_for(author.server)
+
         # Send message for each platform
         tasks = []
         for platform in self._drivers.platforms:
@@ -679,7 +720,8 @@ class Beacon:
             driver = self._drivers.get_driver(platform)
             task: BeaconCallback = BeaconCallback(
                 self._send_platform,
-                args=[driver, author, space, content, preferred_name, preferred_avatar]
+                args=[driver, author, space, content, preferred_name, preferred_avatar],
+                kwargs={"emoji_mapping": emoji_mapping}
             )
             tasks.append(task)
 
