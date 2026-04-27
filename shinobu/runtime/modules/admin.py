@@ -22,7 +22,6 @@ import textwrap
 import time
 import traceback
 import base64
-import random
 import discord
 from contextlib import redirect_stdout
 from discord.ext import commands
