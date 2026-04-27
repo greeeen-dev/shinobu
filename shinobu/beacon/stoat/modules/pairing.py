@@ -105,6 +105,9 @@ class BeaconPairing(commands.Gear):
                     ),
                     color=self.bot.colors.shinobu
                 )
+                embed.set_footer(
+                    text="NOTE: This does not establish a bridge between a paired server."
+                )
                 print(embed.description)
                 await ctx.author.send(embeds=[embed])
             except stoat.HTTPException:
