@@ -34,7 +34,7 @@ class BeaconMessageBlockedReason(Enum):
 
 class BeaconNotInit(Exception):
     def __init__(self):
-        super().__init__("The resource is not available because Beacon isn't ready yet.")
+        super().__init__("The resource is not available because Beacon isn't ready yet or is closed.")
 
 class BeaconPlatformDisabled(Exception):
     def __init__(self, platform: str):
@@ -75,6 +75,7 @@ class Beacon:
         self._config: dict = config or {}
         self._disabled_platforms: list[str] = []
         self._init: bool = False
+        self._shutdown: bool = False
         self._bridge_tasks: dict[str, list] = {}
         self._debug: bool = False
 
@@ -102,7 +103,7 @@ class Beacon:
 
     @property
     def initialized(self) -> bool:
-        return self._init
+        return self._init and not self._shutdown
 
     @property
     def config(self) -> dict:
@@ -391,7 +392,11 @@ class Beacon:
                     pairing.add_partial_server(paired_server.get("id"), paired_server.get("platform"))
                 else:
                     paired_server_obj: beacon_server.BeaconServer = server_driver.get_server(paired_server.get("id"))
-                    pairing.add_server(paired_server_obj)
+
+                    if not paired_server_obj:
+                        pairing.add_partial_server(paired_server.get("id"), paired_server.get("platform"))
+                    else:
+                        pairing.add_server(paired_server_obj)
 
             self.pairing.add_pairing(pairing)
 
@@ -399,11 +404,16 @@ class Beacon:
 
         # Add shutdown cleanup
         # noinspection PyUnresolvedReferences
+        self.__bot.add_cleanup_func("bridge-close", self._mark_shutdown)
+        # noinspection PyUnresolvedReferences
         self.__bot.add_cleanup_func("bridge-save-data", self.save_data)
         # noinspection PyUnresolvedReferences
         self.__bot.add_cleanup_func("bridge-save-cache", self.messages.save)
 
         print("Beacon is ready!")
+
+    def _mark_shutdown(self):
+        self._shutdown = True
 
     def save_data(self):
         if not self.initialized:
@@ -435,6 +445,37 @@ class Beacon:
 
     def _cancel_pending_actions(self, message_id: str):
         self._pending.pop(message_id, None)
+
+    async def ensure_full_entries(self, server: beacon_server.BeaconServer):
+        server_driver: beacon_driver.BeaconDriver = self.drivers.get_driver(server.platform)
+
+        # Upgrade Space membership
+        for space in self.spaces.all_spaces:
+            partial_membership: beacon_space.BeaconPartialSpaceMember | None = space.get_partial_member(server)
+            existing_membership: beacon_space.BeaconPartialSpaceMember | None = space.get_member(server)
+
+            if existing_membership or not partial_membership:
+                continue
+
+            channel: beacon_channel.BeaconChannel | None = server_driver.get_channel(
+                server, partial_membership.channel_id
+            )
+            webhook: beacon_channel.BeaconChannel | None = server_driver.get_channel(
+                server, partial_membership.webhook_id
+            ) if partial_membership.webhook_id else None
+
+            space.join(
+                server=server,
+                channel=channel,
+                webhook=webhook,
+                invite=partial_membership.invite,
+                force=True,
+                upgrade=True
+            )
+
+        # Upgrade Pairings
+        for pairing in self.pairing.pairings:
+            pairing.upgrade_partial_server(server)
 
     async def _run_pending_actions(self, message_id: str):
         if not self.is_pending(message_id):
@@ -514,9 +555,10 @@ class Beacon:
             # Get emoji mappings
             local_emoji_mapping: dict | None = None
             if emoji_mapping:
+                local_emoji_mapping = {}
                 for emoji_name in emoji_mapping:
-                    if member.server_id in emoji_mapping[emoji_name]:
-                        local_emoji_mapping.update({emoji_name, emoji_mapping[emoji_name][member.server_id].name})
+                    if member.platform in emoji_mapping[emoji_name]:
+                        local_emoji_mapping.update({emoji_name: emoji_mapping[emoji_name][member.platform].text})
 
             task: BeaconCallback = BeaconCallback(
                 driver.send,
@@ -563,9 +605,10 @@ class Beacon:
             # Get emoji mappings
             local_emoji_mapping: dict | None = None
             if emoji_mapping:
+                local_emoji_mapping = {}
                 for emoji_name in emoji_mapping:
-                    if message.server.id in emoji_mapping[emoji_name]:
-                        local_emoji_mapping.update({emoji_name, emoji_mapping[emoji_name][message.server.id].name})
+                    if message.platform in emoji_mapping[emoji_name]:
+                        local_emoji_mapping.update({emoji_name: emoji_mapping[emoji_name][message.platform].text})
 
             task: BeaconCallback = BeaconCallback(
                 driver.edit,
@@ -690,7 +733,15 @@ class Beacon:
             raise ValueError("Message blocked from being sent.")
 
         # Get the server's space membership
-        space_membership: beacon_space.BeaconSpaceMember = space.get_member(author.server)
+        space_membership: beacon_space.BeaconSpaceMember | None = space.get_member(author.server)
+
+        if not space_membership:
+            # Check if partial membership exists
+            partial_membership: beacon_space.BeaconPartialSpaceMember | None = space.get_partial_member(author.server)
+            if partial_membership:
+                # Upgrade all existing partial entries to full
+                await self.ensure_full_entries(author.server)
+                space_membership = space.get_member(author.server)
 
         # We'll re-fetch the channel just to check for age-gate status updates
         origin_driver: beacon_driver.BeaconDriver = self._drivers.get_driver(author.platform)
@@ -708,7 +759,7 @@ class Beacon:
         # Get emoji mapping
         emoji_mapping: dict | None = None
         if author.server.pairing:
-            pairing: beacon_pairing.BeaconPairing = self.pairing.get_pairing(author.server.pairing)
+            pairing: beacon_pairing.BeaconPairing | None = self.pairing.get_pairing(author.server.pairing)
             emoji_mapping = pairing.get_matches_for(author.server)
 
         # Send message for each platform
@@ -835,6 +886,14 @@ class Beacon:
 
         # Get the server's space membership
         space_membership: beacon_space.BeaconSpaceMember = space.get_member(author.server)
+
+        if not space_membership:
+            # Check if partial membership exists
+            partial_membership: beacon_space.BeaconPartialSpaceMember | None = space.get_partial_member(author.server)
+            if partial_membership:
+                # Upgrade all existing partial entries to full
+                await self.ensure_full_entries(author.server)
+                space_membership = space.get_member(author.server)
 
         # We'll re-fetch the channel just to check for age-gate status updates
         # noinspection DuplicatedCode

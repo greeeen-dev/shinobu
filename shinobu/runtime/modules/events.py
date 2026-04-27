@@ -58,14 +58,14 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         error_description: str = "An error occurred and the command failed to run. Sorry about that... :<"
 
         # Handle expected errors
-        if isinstance(error, commands.CheckFailure):
-            error_title = "nu >:c"
-            error_description = "You don't have the right permissions to run this command."
-        elif isinstance(error, commands.MissingRequiredArgument):
+        if isinstance(error, commands.MissingRequiredArgument):
             error_title = "eh? 0.0"
             error_description = f"`{error.param.name}` is a required argument that is missing."
         elif isinstance(error, commands.CommandNotFound):
             return
+        elif isinstance(error, commands.CheckFailure) or isinstance(error, discord.CheckFailure):
+            error_title = "nu >:c"
+            error_description = "You don't have the right permissions to run this command."
         else:
             # Unexpected error
             record_error = True

@@ -21,7 +21,7 @@ import traceback
 import stoat
 from discord.ext import commands
 from stoat.ext import commands as stoat_commands, chunking
-from shinobu.runtime.models import shinobu_cog
+from shinobu.runtime.models import shinobu_cog, colors
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.stoat import driver as stoat_driver
 from shinobu.beacon.models import (driver as beacon_driver, file as beacon_file, content as beacon_content,
@@ -37,6 +37,7 @@ class StoatBot(stoat_commands.Bot):
         super().__init__(*args, **kwargs)
         self._beacon: beacon.Beacon = beacon_obj
         self._driver: stoat_driver.StoatDriver = driver_obj
+        self._colors: colors.Colors = colors.Colors()
         self.owner_id: str | None = owner_id # imagine having @commands.is_owner() but not Bot.owner_id. how "suckless"
         self.owner_ids: list = [owner_id] if owner_id else []
 
@@ -47,12 +48,17 @@ class StoatBot(stoat_commands.Bot):
     def beacon(self) -> beacon.Beacon:
         return self._beacon
 
+    @property
+    def colors(self) -> colors.Colors:
+        return self._colors
+
     def register_driver(self):
         if "stoat" not in self._beacon.drivers.platforms:
             self._beacon.drivers.register_driver("stoat", self._driver)
 
     async def add_extensions(self):
         await self.load_extension("shinobu.beacon.stoat.modules.frontend")
+        await self.load_extension("shinobu.beacon.stoat.modules.pairing")
 
     async def _to_beacon_content(self, message: stoat.Message | stoat.PartialMessage, compatibility: bool = False
                                  ) -> beacon_message.BeaconMessageContent:
@@ -511,7 +517,7 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
             self._beacon.drivers.reserve_driver("stoat")
 
             # Create driver
-            self._driver = stoat_driver.StoatDriver(self.stoat_bot, self._beacon.messages)
+            self._driver = stoat_driver.StoatDriver(self.stoat_bot, self._beacon.messages, self._beacon.pairing)
 
         # Restart status
         self._restart: bool = False

@@ -20,7 +20,7 @@ import stoat
 from stoat import routes
 from stoat.core import resolve_id
 from stoat.ext import commands
-from shinobu.beacon.protocol import messages as beacon_messages
+from shinobu.beacon.protocol import messages as beacon_messages, pairing as beacon_pairing
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
                                    member as beacon_member, channel as beacon_channel, message as beacon_message,
                                    messageable as beacon_messageable, content as beacon_content, file as beacon_file,
@@ -96,8 +96,9 @@ class StoatBeaconFilesConverter:
         return [file.data for file in files]
 
 class StoatDriver(beacon_driver.BeaconDriver):
-    def __init__(self, bot, message_cache: beacon_messages.BeaconMessageCache):
-        super().__init__("stoat", bot, message_cache)
+    def __init__(self, bot, message_cache: beacon_messages.BeaconMessageCache,
+                 pairing: beacon_pairing.BeaconPairingManager):
+        super().__init__("stoat", bot, message_cache, pairing)
 
         # Overwrite self.bot (to set typing)
         self._bot: commands.Bot = bot
@@ -110,11 +111,14 @@ class StoatDriver(beacon_driver.BeaconDriver):
         for emoji in server.emojis:
             emojis.append(self._to_beacon_emoji(server.get_emoji(emoji)))
 
+        pairing: beacon_pairing.BeaconPairing = self._pairing.get_pairing_for_server(server.id, self.platform)
+
         return beacon_server.BeaconServer(
             server_id=str(server.id),
             platform=self.platform,
             name=server.name,
-            emojis=emojis
+            emojis=emojis,
+            pairing=pairing.id if pairing else None
         )
 
     def _to_beacon_channel(self, channel: stoat.ServerChannel) -> beacon_channel.BeaconChannel:

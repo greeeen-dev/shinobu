@@ -17,7 +17,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import time
-from shinobu.beacon.protocol import messages as beacon_messages
+from shinobu.beacon.protocol import messages as beacon_messages, pairing as beacon_pairing
 from shinobu.beacon.models import (user as beacon_user, channel as beacon_channel, server as beacon_server,
                                    member as beacon_member, webhook as beacon_webhook, message as beacon_message,
                                    messageable as beacon_messageable)
@@ -73,11 +73,13 @@ class BeaconDriverWebhookCache:
 class BeaconDriver:
     """A class representing a platform driver for the Beacon bridge protocol."""
 
-    def __init__(self, platform: str, bot, message_cache: beacon_messages.BeaconMessageCache):
+    def __init__(self, platform: str, bot, message_cache: beacon_messages.BeaconMessageCache,
+                 pairing: beacon_pairing.BeaconPairingManager):
         self._platform: str = platform
         self._webhooks: BeaconDriverWebhookCache = BeaconDriverWebhookCache()
         self._bot = bot
         self._messages: beacon_messages.BeaconMessageCache = message_cache
+        self._pairing: beacon_pairing.BeaconPairingManager = pairing
 
         # Configs (override this in your platform driver subclass as needed)
         self._supports_multi: bool = True # Enable multicore processing via aiomultiprocess. Must support async

@@ -77,7 +77,7 @@ class BeaconSpaceManager:
     def get_space_for_channel(self, channel: beacon_channel.BeaconChannel) -> beacon_space.BeaconSpace | None:
         for space_id in self._spaces:
             space = self._spaces[space_id]
-            matches = [member for member in space.members if member.channel_id == channel.id]
+            matches = [member for member in space.partial_members if member.channel_id == channel.id]
 
             if len(matches) > 0:
                 return space

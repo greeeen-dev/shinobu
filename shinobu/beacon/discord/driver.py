@@ -21,7 +21,7 @@ import uuid
 import discord
 from datetime import datetime
 from discord.ext import bridge
-from shinobu.beacon.protocol import messages as beacon_messages
+from shinobu.beacon.protocol import messages as beacon_messages, pairing as beacon_pairing
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
                                    member as beacon_member, channel as beacon_channel, webhook as beacon_webhook,
                                    message as beacon_message, messageable as beacon_messageable,
@@ -192,8 +192,9 @@ class DiscordBeaconFilesConverter:
         return [discord.File(fp=io.BytesIO(file.data), filename=file.filename, spoiler=file.spoiler) for file in files]
 
 class DiscordDriver(beacon_driver.BeaconDriver):
-    def __init__(self, bot, message_cache: beacon_messages.BeaconMessageCache):
-        super().__init__("discord", bot, message_cache)
+    def __init__(self, bot, message_cache: beacon_messages.BeaconMessageCache,
+                 pairing: beacon_pairing.BeaconPairingManager):
+        super().__init__("discord", bot, message_cache, pairing)
 
         # Overwrite self.bot (to set typing)
         self._bot: bridge.Bot = bot
@@ -212,12 +213,15 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         for emoji in guild.emojis:
             emojis.append(self._to_beacon_emoji(emoji))
 
+        pairing: beacon_pairing.BeaconPairing = self._pairing.get_pairing_for_server(str(guild.id), self.platform)
+
         return beacon_server.BeaconServer(
             server_id=str(guild.id),
             platform=self.platform,
             name=guild.name,
             filesize_limit=guild.filesize_limit,
-            emojis=emojis
+            emojis=emojis,
+            pairing=pairing.id if pairing else None
         )
 
     def _to_beacon_channel(self, channel: discord.TextChannel) -> beacon_channel.BeaconChannel:
@@ -671,7 +675,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         # Convert message content data
         discord_content: DiscordMessageContent = await self._to_discord_content(
-            content, destination, use_components_v2=self._use_components_v2
+            content, destination, use_components_v2=self._use_components_v2, emoji_mapping=emoji_mapping
         )
 
         # Convert bot user to BeaconUser

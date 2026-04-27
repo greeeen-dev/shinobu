@@ -22,12 +22,12 @@ class BeaconServer(abc.BeaconABC):
     """A class representing a server."""
 
     def __init__(self, server_id: str, platform: str, name: str, filesize_limit: int | None = None,
-                 emojis: list[beacon_emoji.BeaconEmoji] | None = None):
+                 emojis: list[beacon_emoji.BeaconEmoji] | None = None, pairing: str | None = None):
         super().__init__(server_id, platform)
         self._name: str = name
         self._filesize_limit: int | None = filesize_limit
         self._emojis: list[beacon_emoji.BeaconEmoji] = emojis or []
-        self._pairing: str | None = None
+        self._pairing: str | None = pairing
 
     @property
     def name(self) -> str:

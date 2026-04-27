@@ -48,7 +48,7 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
             return
 
         # Create driver
-        self._driver = discord_driver.DiscordDriver(self.bot, self._beacon.messages)
+        self._driver = discord_driver.DiscordDriver(self.bot, self._beacon.messages, self._beacon.pairing)
 
         # Register driver
         self._beacon.drivers.register_driver("discord", self._driver)

@@ -313,7 +313,7 @@ class BeaconSpace:
 
     def join(self, server: beacon_server.BeaconServer, channel: beacon_channel.BeaconChannel,
              webhook: beacon_webhook.BeaconWebhook | str | None = None, invite: BeaconSpaceInvite | None = None,
-             force: bool = False):
+             force: bool = False, upgrade: bool = False):
         """Joins a Space."""
 
         # Note: force should only be used for instance moderators.
@@ -357,13 +357,15 @@ class BeaconSpace:
                 self.invites.remove(invite)
         
         # Join space
-        self.partial_join(
-            platform=server.platform,
-            server_id=server.id,
-            channel_id=channel.id,
-            webhook_id=webhook.id if type(webhook) is beacon_webhook.BeaconWebhook else webhook,
-            invite=invite.code if invite else None
-        )
+        if not upgrade:
+            self.partial_join(
+                platform=server.platform,
+                server_id=server.id,
+                channel_id=channel.id,
+                webhook_id=webhook.id if type(webhook) is beacon_webhook.BeaconWebhook else webhook,
+                invite=invite.code if invite else None
+            )
+
         self._members.append(new_membership)
 
     def partial_join(self, platform: str, server_id: str, channel_id: str, webhook_id: str | None = None,

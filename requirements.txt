@@ -8,7 +8,7 @@ aiomultiprocess
 jellyfish
 tld
 better-profanity
-stoat.py
+git+https://github.com/greeeen-dev/weasel.git
 aiohttp[speedups]
 argon2-cffi
 psutil

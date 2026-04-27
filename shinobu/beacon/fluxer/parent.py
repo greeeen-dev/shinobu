@@ -79,7 +79,7 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
             self._beacon.drivers.reserve_driver("fluxer")
 
             # Create driver
-            self._driver = fluxer_driver.FluxerDriver(self.fluxer_bot, self._beacon.messages)
+            self._driver = fluxer_driver.FluxerDriver(self.fluxer_bot, self._beacon.messages, self._beacon.pairing)
 
         # Restart status
         self._restart: bool = False
@@ -147,7 +147,7 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                     break
                 except:
                     traceback.print_exc()
-                    print("fluxer bot died, restarting in 5 seconds")
+                    print("Restarting Fluxer bot in 5 seconds.")
 
                     try:
                         await asyncio.sleep(5)
