@@ -69,6 +69,9 @@ raw_encryptor: manager.RawEncryptor | None = None
 # Create password variable
 password: str | None = None
 
+# Create version variable
+version: str = "0.0.0"
+
 # Get manifests
 plugins_data: dict = {manifest_path: {}}
 if os.path.exists("plugins"):
@@ -196,13 +199,18 @@ class SecretsIssuingAuthority:
         if wrapper.uuid != self._wrappers_uuids[id(wrapper)]:
             raise ValueError("Wrapper UUID mismatch")
 
-    def _load_manifest(self, filepath):
+    def _load_manifest(self, filepath, set_version: bool = False):
         # Read plugin data
         data: dict = plugins_data.get(filepath)
 
         if not data:
             # Assume invalid data
             return
+
+        # Set version if needed
+        global version
+        if set_version:
+            version = data.get("version", version)
 
         # Retrieve configs
         configs = data.get("configs", [])
@@ -245,7 +253,7 @@ class SecretsIssuingAuthority:
         self._cogs_registered_files = {}
 
         # Load builtin manifest
-        self._load_manifest(manifest_path)
+        self._load_manifest(manifest_path, set_version=True)
 
         if not os.path.exists("plugins"):
             # There's no plugins to load!
@@ -591,7 +599,9 @@ def start_bot() -> bool:
     intents.presences = False
 
     # Create Shinobu bot instance
-    bot: runtime.ShinobuBot = runtime.ShinobuBot(command_prefix="sh!", intents=intents, manifest=manifest_path)
+    bot: runtime.ShinobuBot = runtime.ShinobuBot(
+        command_prefix="sh!", intents=intents, manifest=manifest_path, version=version
+    )
     bot.restart_message_id = restart_message_id
     bot.restart_message_channel_id = restart_message_channel_id
     bot.setup_entitlements_loader(ModuleLoader(bot))

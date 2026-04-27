@@ -64,6 +64,8 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         elif isinstance(error, commands.MissingRequiredArgument):
             error_title = "eh? 0.0"
             error_description = f"`{error.param.name}` is a required argument that is missing."
+        elif isinstance(error, commands.CommandNotFound):
+            return
         else:
             # Unexpected error
             record_error = True

@@ -44,16 +44,6 @@ class Admin(shinobu_cog.ShinobuCog):
             )
         )
 
-    @commands.command(name="nya", aliases=["mrrp", "meow", "miao"])
-    async def nya(self, ctx: commands.Context):
-        """:333"""
-
-        cat_noises = [
-            "meow", "mrrp", "nya", "miao", "purr"
-        ]
-
-        await ctx.send(" ".join([random.choice(cat_noises) for _ in range(3)]) + " :333")
-
     @commands.command(name="eval")
     @commands.is_owner()
     async def eval(self, ctx: commands.Context, *, body: str):

@@ -53,6 +53,7 @@ class ShinobuBot(bridge.Bot):
         self.__cog_entitlements_loader = None
         self._cleanups = {}
         self._colors: colors.Colors = colors.Colors()
+        self._version: str = kwargs.get("version", "0.0.0")
 
         # Restart state
         self._should_restart: bool = False # Restart on crash
@@ -79,6 +80,7 @@ class ShinobuBot(bridge.Bot):
         # Load events handler (this doesn't need entitlements)
         self.load_extension("shinobu.runtime.modules.events")
         self.load_extension("shinobu.runtime.modules.admin")
+        self.load_extension("shinobu.runtime.modules.general")
 
     def setup_entitlements_loader(self, loader):
         if self.__cog_entitlements_loader:
@@ -124,6 +126,10 @@ class ShinobuBot(bridge.Bot):
     @property
     def config(self) -> dict:
         return self._config
+
+    @property
+    def version(self) -> str:
+        return self._version
 
     @property
     def colors(self) -> colors.Colors:
