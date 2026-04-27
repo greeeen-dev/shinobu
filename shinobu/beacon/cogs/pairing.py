@@ -49,16 +49,16 @@ class BeaconPairing(shinobu_cog.ShinobuCog):
     @CommandChecks.can_manage()
     async def pair_server(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
                           code: str | None = None):
-        """Pairs a server with other servers to enable more bridge features."""
+        """Pairs the server with other servers to enable more bridge features."""
 
         discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
         server: beacon_server.BeaconServer = discord_driver.get_server(str(ctx.guild.id))
 
         if code:
             # Get pairing code's server
-            pair_server: beacon_server.BeaconServer | None = self._beacon.pairing.get_pairing_code_server(code)
+            origin_server: beacon_server.BeaconServer | None = self._beacon.pairing.get_pairing_code_server(code)
 
-            if not pair_server:
+            if not origin_server:
                 if isinstance(ctx, bridge.BridgeApplicationContext):
                     await ctx.response.send_message("not a valid pairing code :c", ephemeral=True)
                 else:
@@ -75,18 +75,23 @@ class BeaconPairing(shinobu_cog.ShinobuCog):
             if server.pairing:
                 # Get pairing
                 pairing: beacon_pairing.BeaconPairing = self._beacon.pairing.get_pairing(server.pairing)
+            elif origin_server.pairing:
+                # Get pairing
+                pairing: beacon_pairing.BeaconPairing = self._beacon.pairing.get_pairing(origin_server.pairing)
             else:
                 # Create new pairing
                 pairing: beacon_pairing.BeaconPairing = beacon_pairing.BeaconPairing(str(uuid.uuid4()))
-                pairing.add_server(pair_server)
                 new_pairing = True
 
             # Add server to pairing
             pairing.add_server(server)
+            pairing.add_server(origin_server)
 
             # Register pairing if needed
             if new_pairing:
                 self._beacon.pairing.add_pairing(pairing)
+            else:
+                self._beacon.pairing.update_pairing(pairing.id)
 
             embed: discord.Embed = discord.Embed(
                 title=":white_check_mark: servers paired!",
@@ -133,7 +138,7 @@ class BeaconPairing(shinobu_cog.ShinobuCog):
     @pairing_universal.command(name="unpair-server")
     @CommandChecks.can_manage()
     async def unpair_server(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext):
-        """Unpairs a server from its current pairing."""
+        """Unpairs the server from its current pairing."""
 
         discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
         server: beacon_server.BeaconServer = discord_driver.get_server(str(ctx.guild.id))
@@ -147,6 +152,7 @@ class BeaconPairing(shinobu_cog.ShinobuCog):
 
         pairing: beacon_pairing.BeaconPairing = self._beacon.pairing.get_pairing(server.pairing)
         pairing.remove_server(server)
+        self._beacon.pairing.remove_server_mapping(server)
 
         embed: discord.Embed = discord.Embed(
             title=":white_check_mark: server unpaired!",
@@ -155,6 +161,31 @@ class BeaconPairing(shinobu_cog.ShinobuCog):
         )
         await ctx.respond(embed=embed)
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
+
+    @pairing_universal.command(name="pair-info")
+    @CommandChecks.can_manage()
+    async def pair_info(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext):
+        """Shows information about the server's current pairing."""
+
+        discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+        server: beacon_server.BeaconServer = discord_driver.get_server(str(ctx.guild.id))
+
+        if not server.pairing:
+            if isinstance(ctx, bridge.BridgeApplicationContext):
+                await ctx.response.send_message("your server isn't paired :/", ephemeral=True)
+            else:
+                await ctx.respond("your server isn't paired :/")
+            return
+
+        pairing: beacon_pairing.BeaconPairing = self._beacon.pairing.get_pairing(server.pairing)
+
+        embed: discord.Embed = discord.Embed(
+            title=":information_source: pairing info",
+            color=self.bot.colors.shinobu
+        )
+        embed.add_field(name="Pairing ID", value=pairing.id, inline=False)
+        embed.add_field(name="Paired servers", value=str(len(pairing.partial_servers)), inline=False)
+        await ctx.respond(embed=embed)
 
 def get_cog_type():
     return BeaconPairing

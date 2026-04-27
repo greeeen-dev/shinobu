@@ -20,7 +20,7 @@ import asyncio
 import traceback
 import fluxer
 from discord.ext import commands
-from shinobu.runtime.models import shinobu_cog
+from shinobu.runtime.models import shinobu_cog, colors
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.fluxer import driver as fluxer_driver
 from shinobu.beacon.models import driver as beacon_driver
@@ -30,6 +30,7 @@ class FluxerBot(fluxer.Bot):
         super().__init__(*args, **kwargs)
         self._beacon: beacon.Beacon = beacon_obj
         self._driver: fluxer_driver.FluxerDriver = driver_obj
+        self._colors: colors.Colors = colors.Colors()
 
     def register_driver(self):
         if "fluxer" in self._beacon.drivers.platforms:
@@ -41,6 +42,10 @@ class FluxerBot(fluxer.Bot):
     @property
     def beacon(self) -> beacon.Beacon:
         return self._beacon
+
+    @property
+    def colors(self) -> colors.Colors:
+        return self._colors
 
 class FluxerDriverParent(shinobu_cog.ShinobuCog):
     def __init__(self, bot):
@@ -125,6 +130,7 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                 # Load events cog
                 await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.events")
                 await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.frontend")
+                await self.fluxer_bot.load_extension("shinobu.beacon.fluxer.modules.pairing")
 
                 # Set stop function
                 self.bot.add_cleanup_func("fluxer-bot-shutdown", self.stop_bot)

@@ -41,18 +41,25 @@ class BeaconPairing:
         return self._partial_servers.copy()
 
     def add_server(self, server):
+        if server.pairing == self.id:
+            # Assume paired
+            return
+        
         server.pair(self._id)
         self._servers.update({server.id: server})
         self.add_partial_server(server.id, server.platform)
 
     def add_partial_server(self, server_id: str, platform: str):
+        if self.has_partial_entry(server_id, platform):
+            return
+        
         self._partial_servers.append({"id": server_id, "platform": platform})
 
     def upgrade_partial_server(self, server):
         if server.id in self._servers:
             return
 
-        has_partial: bool = self.get_partial_matches_for(server.id, server.platform)
+        has_partial: bool = self.has_partial_entry(server.id, server.platform)
 
         if has_partial:
             self._servers.update({server.id: server})
@@ -92,7 +99,7 @@ class BeaconPairing:
 
         return mapping
 
-    def get_partial_matches_for(self, server_id: str, platform: str):
+    def has_partial_entry(self, server_id: str, platform: str):
         has_partial: bool = False
         for partial_server in self._partial_servers:
             if partial_server["id"] == server_id and partial_server["platform"] == platform:
@@ -145,12 +152,21 @@ class BeaconPairingManager:
     def add_pairing(self, pairing: BeaconPairing):
         """Adds a Beacon server pair."""
         self._pairings.update({pairing.id: pairing})
+        self.update_pairing(pairing.id)
+
+    def update_pairing(self, pairing_id: str):
+        pairing: BeaconPairing | None = self._pairings.get(pairing_id)
+        if not pairing:
+            return
 
         for server in pairing.partial_servers:
             if server["platform"] not in self._server_mapping:
                 self._server_mapping.update({server["platform"]: {}})
 
             self._server_mapping[server["platform"]].update({server["id"]: pairing.id})
+
+    def remove_server_mapping(self, server):
+        self._server_mapping.get(server["platform"], {}).pop(server["id"], None)
 
     def remove_pairing(self, pairing_id: str):
         self._pairings.pop(pairing_id)
@@ -164,7 +180,7 @@ class BeaconPairingManager:
             return None
 
         pairing: BeaconPairing = self.get_pairing(pairing_id)
-        if pairing.get_partial_matches_for(server_id, platform):
+        if pairing.has_partial_entry(server_id, platform):
             return pairing
 
     def to_dict(self) -> dict:

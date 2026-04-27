@@ -18,38 +18,36 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import uuid
-import stoat
-from stoat.ext import commands
-from shinobu.beacon.stoat.models import embed as stoat_embed
+import fluxer
+from fluxer import cog
 from shinobu.beacon.protocol import beacon, pairing as beacon_pairing
 from shinobu.beacon.models import server as beacon_server, driver as beacon_driver
 
-class BeaconPairing(commands.Gear):
+class BeaconPairing(cog.Cog):
     def __init__(self, bot):
-        self.bot: commands.Bot = bot
+        # Register cog metadata
+        super().__init__(bot)
 
         # Get Beacon
         # noinspection PyUnresolvedReferences
         self._beacon: beacon.Beacon = self.bot.beacon
 
-    @commands.group(name='pairing')
-    async def pairing_text(self, ctx):
-        pass
-
-    @pairing_text.command(name="pair-server")
-    @commands.is_owner()
-    async def pair_server(self, ctx: commands.Context, code: str | None = None):
+    @cog.Cog.command(name="pair-server")
+    async def pair_server(self, ctx: fluxer.Message, code: str | None = None):
         """Pairs a server with other servers to enable more bridge features."""
+        
+        if ctx.author.id != 1472271558005039139:
+            return
 
-        stoat_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
-        server: beacon_server.BeaconServer = stoat_driver.get_server(ctx.server.id)
+        fluxer_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("fluxer")
+        server: beacon_server.BeaconServer = fluxer_driver.get_server(str(ctx.guild.id))
 
         if code:
             # Get pairing code's server
             origin_server: beacon_server.BeaconServer | None = self._beacon.pairing.get_pairing_code_server(code)
 
             if not origin_server:
-                await ctx.send("not a valid pairing code :c", replies=[ctx.message])
+                await ctx.reply("not a valid pairing code :c")
 
             # Revoke pairing code
             self._beacon.pairing.revoke_pairing_code(code)
@@ -69,7 +67,7 @@ class BeaconPairing(commands.Gear):
                 pairing: beacon_pairing.BeaconPairing = beacon_pairing.BeaconPairing(str(uuid.uuid4()))
                 new_pairing = True
 
-            # Add server to pairing
+            # Add servers to pairing
             pairing.add_server(server)
             pairing.add_server(origin_server)
 
@@ -79,7 +77,7 @@ class BeaconPairing(commands.Gear):
             else:
                 self._beacon.pairing.update_pairing(pairing.id)
 
-            embed: stoat_embed.Embed = stoat_embed.Embed(
+            embed: fluxer.Embed = fluxer.Embed(
                 title="\U00002705 servers paired!",
                 description=f"Your server is now paired with **{len(pairing.servers) - 1}** other server(s).",
                 color=self.bot.colors.success
@@ -92,7 +90,7 @@ class BeaconPairing(commands.Gear):
                 text="This pairing code is now revoked. To pair more servers, you will need a new pairing code."
             )
 
-            await ctx.send(embeds=[embed], replies=[ctx.message])
+            await ctx.reply(embeds=[embed])
 
             loop = asyncio.get_event_loop()
             # noinspection PyTypeChecker
@@ -102,7 +100,7 @@ class BeaconPairing(commands.Gear):
             code: str = self._beacon.pairing.new_pairing_code(server)
 
             try:
-                embed: stoat_embed.Embed = stoat_embed.Embed(
+                embed: fluxer.Embed = fluxer.Embed(
                     title="your pairing code is here \U0001F440",
                     description=(
                         f"Pairing code: ||`{code}`||\n"+
@@ -116,60 +114,64 @@ class BeaconPairing(commands.Gear):
                 )
 
                 await ctx.author.send(embeds=[embed])
-            except stoat.HTTPException:
+            except fluxer.HTTPException:
                 self._beacon.pairing.revoke_pairing_code(code)
-                await ctx.send("couldn't send you a dm, please enable dms! :c", replies=[ctx.message])
+                await ctx.reply("couldn't send you a dm, please enable dms! :c")
             else:
-                await ctx.send("pairing code created! check your dms :eyes:", replies=[ctx.message])
+                await ctx.reply("pairing code created! check your dms :eyes:")
 
-    @pairing_text.command(name="unpair-server")
-    @commands.is_owner()
-    async def unpair_server(self, ctx: commands.Context):
+    @cog.Cog.command(name="unpair-server")
+    async def unpair_server(self, ctx: fluxer.Message):
         """Unpairs the server from its current pairing."""
 
-        stoat_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
-        server: beacon_server.BeaconServer = stoat_driver.get_server(ctx.server.id)
+        if ctx.author.id != 1472271558005039139:
+            return
+
+        fluxer_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("fluxer")
+        server: beacon_server.BeaconServer = fluxer_driver.get_server(str(ctx.guild.id))
 
         if not server.pairing:
-            await ctx.send("your server isn't paired :/", replies=[ctx.message])
+            await ctx.reply("your server isn't paired :/")
             return
 
         pairing: beacon_pairing.BeaconPairing = self._beacon.pairing.get_pairing(server.pairing)
         pairing.remove_server(server)
-        self._beacon.pairing.remove_server_mapping(server)
+        self._beacon.pairing.remove_server_mapping(server.id)
 
-        embed: stoat_embed.Embed = stoat_embed.Embed(
+        embed: fluxer.Embed = fluxer.Embed(
             title="\U00002705 server unpaired!",
             description=f"Your server is no longer paired with Pairing `{pairing.id}`.",
             color=self.bot.colors.success
         )
-        await ctx.send(embeds=[embed], replies=[ctx.message])
+        await ctx.reply(embed=embed)
 
         loop = asyncio.get_event_loop()
         # noinspection PyTypeChecker
         await loop.run_in_executor(None, self._beacon.save_data)
 
-    @pairing_text.command(name="pair-info")
-    @commands.is_owner()
-    async def pair_info(self, ctx: commands.Context):
+    @cog.Cog.command(name="pair-info")
+    async def pair_info(self, ctx: fluxer.Message):
         """Shows information about the server's current pairing."""
 
-        stoat_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("stoat")
-        server: beacon_server.BeaconServer = stoat_driver.get_server(ctx.server.id)
+        if ctx.author.id != 1472271558005039139:
+            return
+
+        fluxer_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("fluxer")
+        server: beacon_server.BeaconServer = fluxer_driver.get_server(str(ctx.guild.id))
 
         if not server.pairing:
-            await ctx.send("your server isn't paired :/", replies=[ctx.message])
+            await ctx.reply("your server isn't paired :/")
             return
 
         pairing: beacon_pairing.BeaconPairing = self._beacon.pairing.get_pairing(server.pairing)
 
-        embed: stoat_embed.Embed = stoat_embed.Embed(
+        embed: fluxer.Embed = fluxer.Embed(
             title="\U00002139\U0000FE0F pairing info",
             color=self.bot.colors.shinobu
         )
-        embed.add_field(name="Pairing ID", value=pairing.id)
-        embed.add_field(name="Paired servers", value=str(len(pairing.partial_servers)))
-        await ctx.send(embeds=[embed], replies=[ctx.message])
+        embed.add_field(name="Pairing ID", value=pairing.id, inline=False)
+        embed.add_field(name="Paired servers", value=str(len(pairing.partial_servers)), inline=False)
+        await ctx.reply(embed=embed)
 
-async def setup(bot: commands.Bot):
-    await bot.add_gear(BeaconPairing(bot))
+async def setup(bot):
+    await bot.add_cog(BeaconPairing(bot))
