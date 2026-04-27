@@ -617,7 +617,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=self.debug)
+            await self._strategy_async(tasks, return_exceptions=False)
         else:
             await self._strategy_sequential(tasks)
 

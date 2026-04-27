@@ -17,6 +17,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import stoat
+from stoat import routes
+from stoat.core import resolve_id
 from stoat.ext import commands
 from shinobu.beacon.protocol import messages as beacon_messages
 from shinobu.beacon.models import (driver as beacon_driver, user as beacon_user, server as beacon_server,
@@ -497,4 +499,10 @@ class StoatDriver(beacon_driver.BeaconDriver):
         await self.bot.http.pin_message(message.channel.id, message.id)
 
     async def _unpin(self, message: beacon_message.BeaconMessage):
-        await self.bot.http.unpin_message(message.channel.id, message.id)
+        # WHY DOES HTTPClient.unpin_message USE routes.CHANNELS_MESSAGE_PIN?????
+        await self.bot.http.request(
+            routes.CHANNELS_MESSAGE_UNPIN.compile(
+                channel_id=resolve_id(message.channel.id),
+                message_id=resolve_id(message.id),
+            )
+        )

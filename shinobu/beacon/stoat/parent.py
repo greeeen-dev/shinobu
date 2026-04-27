@@ -21,7 +21,6 @@ import traceback
 import stoat
 from discord.ext import commands
 from stoat.ext import commands as stoat_commands, chunking
-from stoat.cache import _MEMBER_THROUGH_SERVER_GETTER
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.stoat import driver as stoat_driver
@@ -302,6 +301,9 @@ class StoatBot(stoat_commands.Bot):
 
     async def on_ready(self, _, /):
         print(f"Logged in to Stoat as {self.user.name}#{self.user.discriminator} ({self.user.id})")
+
+        # Induce artificial delay to wait for servers to load
+        await asyncio.sleep(1)
 
         # noinspection PyUnresolvedReferences
         self.register_driver()
