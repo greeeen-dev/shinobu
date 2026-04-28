@@ -152,12 +152,15 @@ class BeaconConfig(shinobu_cog.ShinobuCog):
             view.add_item(container)
 
             if not interaction:
-                result: discord.Message | discord.Interaction = await ctx.respond(view=view)
-
-                if isinstance(result, discord.Interaction):
-                    message = await result.original_response()
+                if is_done:
+                    await message.edit(view=view)
                 else:
-                    message = result
+                    result: discord.Message | discord.Interaction = await ctx.respond(view=view)
+
+                    if isinstance(result, discord.Interaction):
+                        message = await result.original_response()
+                    else:
+                        message = result
             else:
                 if interaction.response.is_done():
                     await message.edit(view=view)
