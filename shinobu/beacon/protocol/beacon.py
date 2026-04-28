@@ -238,8 +238,9 @@ class Beacon:
                 space_name=space_data.get("name"),
                 space_emoji=space_data.get("emoji"),
                 private=space_data.get("options", {}).get("private"),
-                private_owner_id=space_data.get("options", {}).get("private_owner_id"),
-                private_owner_platform=space_data.get("options", {}).get("private_owner_platform"),
+                owner_id=space_data.get("owner_id", space_data.get("options", {}).get("private_owner_id")),
+                owner_platform=space_data.get("owner_platform",
+                                              space_data.get("options", {}).get("private_owner_platform")),
                 nsfw=space_data.get("options", {}).get("nsfw"),
                 relay_deletes=space_data.get("options", {}).get("relay_deletes", True),
                 relay_edits=space_data.get("options", {}).get("relay_edits", True),
@@ -573,7 +574,9 @@ class Beacon:
 
         try:
             if driver.supports_async:
-                results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(tasks, return_exceptions=self.debug)
+                results: tuple[beacon_message.BeaconMessage] = await self._strategy_async(
+                    tasks, return_exceptions=not self.debug
+                )
             else:
                 results: list[beacon_message.BeaconMessage] = await self._strategy_sequential(tasks)
         except asyncio.TimeoutError:
@@ -618,7 +621,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=self.debug)
+            await self._strategy_async(tasks, return_exceptions=not self.debug)
         else:
             await self._strategy_sequential(tasks)
 
@@ -639,7 +642,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=self.debug)
+            await self._strategy_async(tasks, return_exceptions=not self.debug)
         else:
             await self._strategy_sequential(tasks)
 
@@ -668,7 +671,7 @@ class Beacon:
             tasks.append(task)
 
         if driver.supports_async:
-            await self._strategy_async(tasks, return_exceptions=self.debug)
+            await self._strategy_async(tasks, return_exceptions=not self.debug)
         else:
             await self._strategy_sequential(tasks)
 
@@ -783,7 +786,9 @@ class Beacon:
 
         # Bridge to platforms
         try:
-            results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(tasks, return_exceptions=self.debug)
+            results: tuple[list[beacon_message.BeaconMessage] | Exception] = await self._strategy_async(
+                tasks, return_exceptions=not self.debug
+            )
         except TimeoutError:
             # Wipe webhook cache
             for should_wipe in self._webhook_cache_wipe:

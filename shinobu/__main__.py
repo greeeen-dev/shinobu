@@ -50,11 +50,13 @@ parser = argparse.ArgumentParser(
 )
 parser.add_argument("--secrets", help="Launches the Secrets Manager CLI.", action="store_true")
 parser.add_argument("--installer", help="Launches the installer CLI.", action="store_true")
+parser.add_argument("--devmode", help="Launches Shinobu with developer mode.", action="store_true")
 launch_args = parser.parse_args()
 
 # Get launch options
 launch_secrets_cli: bool = launch_args.secrets
 launch_installer_cli: bool = launch_args.installer
+devmode: bool = launch_args.devmode
 
 # Store restart options
 restart_message_id: int | None = None
@@ -600,7 +602,7 @@ def start_bot() -> bool:
 
     # Create Shinobu bot instance
     bot: runtime.ShinobuBot = runtime.ShinobuBot(
-        command_prefix="sh!", intents=intents, manifest=manifest_path, version=version
+        command_prefix="sh!", intents=intents, manifest=manifest_path, version=version, devmode=devmode
     )
     bot.restart_message_id = restart_message_id
     bot.restart_message_channel_id = restart_message_channel_id

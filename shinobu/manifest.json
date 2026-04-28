@@ -9,6 +9,7 @@
     "shinobu.beacon.cogs.manager",
     "shinobu.beacon.cogs.frontend",
     "shinobu.beacon.cogs.moderation",
+    "shinobu.beacon.cogs.config",
     "shinobu.beacon.cogs.pairing",
     "shinobu.beacon.discord.parent",
     "shinobu.beacon.stoat.parent",

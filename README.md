@@ -39,6 +39,7 @@ You can use Shinobu if you want, but please note support may be limited. Use at 
 - [X] Stoat (formerly Revolt) support (v0.2)
 - [X] Bridge cache backup and restore (v0.2)
 - [ ] Moderation & customization tools (v0.3/v1)
+- [ ] Move development to bugfix and dev branches (v1)
 
 ### And the stuff reserved for later
 - [ ] Spacebar support

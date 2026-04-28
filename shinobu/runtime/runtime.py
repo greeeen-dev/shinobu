@@ -54,6 +54,8 @@ class ShinobuBot(bridge.Bot):
         self._cleanups = {}
         self._colors: colors.Colors = colors.Colors()
         self._version: str = kwargs.get("version", "0.0.0")
+        self._devmode: bool = kwargs.get("devmode", False)
+        self._on_ready_count: int = 0
 
         # Restart state
         self._should_restart: bool = False # Restart on crash
@@ -162,3 +164,9 @@ class ShinobuBot(bridge.Bot):
         if message:
             self.restart_message_id = message.id
             self.restart_message_channel_id = message.channel.id
+
+    def add_on_ready_count(self):
+        self._on_ready_count += 1
+
+    def devmode_should_shutdown(self):
+        return self._devmode and self._on_ready_count >= 3

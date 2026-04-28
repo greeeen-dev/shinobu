@@ -205,7 +205,7 @@ class ShinobuListBaseView:
     def search(self, query: str, by_title: bool = True, by_desc: bool = True, use_both: bool = False):
         # Check if an entry exists with this exact ID
         for entry in self.current_entries:
-            if entry.id == query:
+            if entry.id == query or f"{entry.name} ({entry.id})" == query:
                 return self.select(entry)
 
         if use_both:
@@ -484,7 +484,10 @@ class ShinobuListDiscordView(ShinobuListBaseView):
 
         # Wait for interactions
         def check(incoming: discord.Interaction):
-            return incoming.user.id == initiator_user.id and incoming.channel_id == initiator.channel_id
+            if not incoming.message:
+                return False
+
+            return incoming.user.id == initiator_user.id and incoming.message.id == message.id
 
         should_update: bool = True
 

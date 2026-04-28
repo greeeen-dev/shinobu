@@ -18,13 +18,13 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import uuid
 import discord
+from functools import partial
 from discord.ext import commands, bridge
 from shinobu.runtime.models import shinobu_cog, ui_kit
 from shinobu.beacon.protocol import beacon
 from shinobu.beacon.models import (space as beacon_space, driver as beacon_driver, server as beacon_server,
                                    channel as beacon_channel, webhook as beacon_webhook)
 from shinobu.runtime.models.ui_kit import ShinobuListEntry
-
 
 class BeaconFrontend(shinobu_cog.ShinobuCog):
     def __init__(self, bot):
@@ -48,6 +48,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         pass
 
     @bridge_universal.command(name="new-space")
+    @bridge.bridge_option("name", description="The name of the space.")
     @commands.is_owner() # Owner only for now for debugging purposes
     async def new_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, *, name: str):
         """Creates a new Space."""
@@ -61,6 +62,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
     @bridge_universal.command(name="delete-space")
+    @bridge.bridge_option("space_id", description="The ID of the Space to delete.")
     @commands.is_owner()  # Owner only for now for debugging purposes
     async def delete_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
         """Deletes a Space."""
@@ -73,7 +75,40 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         await ctx.respond(f"space deleted T.T")
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
+    async def list_spaces_autocomplete(self, ctx: discord.AutocompleteContext) -> list[discord.OptionChoice]:
+        priority_matches: list[str] = []
+        matches: list[str] = []
+        discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
+
+        for space in self._beacon.spaces.all_spaces:
+            should_hide: bool = False
+            if space.private:
+                # Check if we have access to this space
+                should_hide = not space.has_access(
+                    discord_driver.get_server(str(ctx.interaction.guild.id))
+                ) if ctx.interaction.guild else True
+
+            if should_hide:
+                continue
+
+            if space.name.lower().startswith(ctx.value.lower()):
+                priority_matches.append(f"{space.name} ({space.id})")
+            elif ctx.value.lower() in space.name.lower():
+                matches.append(f"{space.name} ({space.id})")
+            elif ctx.value.lower() == space.id:
+                priority_matches.insert(0, f"{space.name} ({space.id})")
+            elif len(ctx.value) == 0:
+                matches.append(f"{space.name} ({space.id})")
+
+        all_matches: list[str] = priority_matches + matches
+
+        return [
+            discord.OptionChoice(name=all_matches[i]) for i in range(len(all_matches) if len(all_matches) <= 25 else 25)
+        ]
+
     @bridge_universal.command(name="spaces")
+    @bridge.bridge_option("query", description="The search query. Leave empty to list all Spaces.",
+                          autocomplete=partial(list_spaces_autocomplete))
     async def list_spaces(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, query: str | None = None):
         """Shows all available Spaces."""
 
@@ -112,6 +147,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         await list_ui.run(self.bot, ctx, query=query)
 
     @bridge_universal.command(name="join-space")
+    @bridge.bridge_option("space_id", description="The ID or invite of the Space to join.")
     @commands.is_owner()
     async def join_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
         """Joins a Space."""
@@ -154,6 +190,7 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
     @bridge_universal.command(name="leave-space")
+    @bridge.bridge_option("space_id", description="The ID of the Space to leave.")
     @commands.is_owner()
     async def leave_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
         """Leaves a Space."""

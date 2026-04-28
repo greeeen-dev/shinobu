@@ -20,6 +20,7 @@ import uuid
 import traceback
 import discord
 from discord.ext import commands, bridge
+from shinobu.runtime.models import errors
 from shinobu.runtime.models.colors import Colors
 from shinobu.runtime.utils import check_slash
 
@@ -66,6 +67,9 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         elif isinstance(error, commands.CheckFailure) or isinstance(error, discord.CheckFailure):
             error_title = "nu >:c"
             error_description = "You don't have the right permissions to run this command."
+        elif isinstance(error, errors.ShinobuBadArgumentValue):
+            error_title = "awh :c"
+            error_description = error.__str__()
         else:
             # Unexpected error
             record_error = True
@@ -113,6 +117,15 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
 
             message: discord.PartialMessage = discord.PartialMessage(channel=channel, id=self.bot.restart_message_id)
             await message.edit(content="bot restarted! :white_check_mark:")
+
+            # Reset restart message
+            self.bot.restart_message_id = None
+            self.bot.restart_message_channel_id = None
+
+        self.bot.add_on_ready_count()
+        if self.bot.devmode_should_shutdown():
+            print("Did you leave the bot running overnight...?")
+            await self.bot.close()
 
     @commands.Cog.listener()
     async def on_command_error(self, ctx, error):

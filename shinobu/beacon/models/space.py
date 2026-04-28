@@ -192,13 +192,15 @@ class BeaconSpaceMember:
 class BeaconSpace:
     def __init__(self, space_id: str, space_name: str, space_emoji: str | None = None, members: list | None = None,
                  partial_members: list| None = None, invites: list | None = None, bans: list | None = None,
-                 private: bool = False, nsfw: bool = False, private_owner_id: str | None = None,
-                 private_owner_platform: str | None = None, relay_deletes: bool = True, relay_edits: bool = True,
+                 private: bool = False, nsfw: bool = False, owner_id: str | None = None,
+                 owner_platform: str | None = None, relay_deletes: bool = True, relay_edits: bool = True,
                  relay_pins: bool = False, relay_large_attachments: bool = True, compatibility: bool = False,
                  filters: list | None = None, filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
         self._emoji: str = space_emoji
+        self._owner_id: str | None = owner_id
+        self._owner_platform: str | None = owner_platform
         self._members: list[BeaconSpaceMember] = members or []
         self._partial_members: list[BeaconPartialSpaceMember] = partial_members or []
         self._invites: list[BeaconSpaceInvite] = invites or []
@@ -206,8 +208,6 @@ class BeaconSpace:
 
         # Room options
         self._private: bool = private
-        self._private_owner_id: str | None = private_owner_id
-        self._private_owner_platform: str | None = private_owner_platform
         self._nsfw: bool = nsfw
         self._deletes: bool = relay_deletes
         self._edits: bool = relay_edits
@@ -230,7 +230,11 @@ class BeaconSpace:
         return self._emoji
 
     @property
-    def members(self) -> list:
+    def decorated_name(self) -> str:
+        return f"{self.emoji} {self.name}" if self.emoji else self.name
+
+    @property
+    def members(self) -> list[BeaconSpaceMember]:
         return self._members
 
     @property
@@ -250,12 +254,12 @@ class BeaconSpace:
         return self._private
 
     @property
-    def private_owner_id(self) -> str | None:
-        return self._private_owner_id if self._private else None
+    def owner_id(self) -> str | None:
+        return self._owner_id if self._private else None
 
     @property
-    def private_owner_platform(self) -> str | None:
-        return self._private_owner_platform if self._private else None
+    def owner_platform(self) -> str | None:
+        return self._owner_platform if self._private else None
 
     @property
     def nsfw(self) -> bool:
@@ -265,21 +269,41 @@ class BeaconSpace:
     def relay_deletes(self) -> bool:
         return self._deletes
 
+    @relay_deletes.setter
+    def relay_deletes(self, new_value: bool):
+        self._deletes = new_value
+
     @property
     def relay_edits(self) -> bool:
         return self._edits
+
+    @relay_edits.setter
+    def relay_edits(self, new_value: bool):
+        self._edits = new_value
 
     @property
     def relay_pins(self) -> bool:
         return self._pins
 
+    @relay_pins.setter
+    def relay_pins(self, new_value: bool):
+        self._pins = new_value
+
     @property
     def convert_large_files(self) -> bool:
         return self._attachments_url
 
+    @convert_large_files.setter
+    def convert_large_files(self, new_value: bool):
+        self._attachments_url = new_value
+
     @property
     def compatibility(self) -> bool:
         return self._compatibility
+
+    @compatibility.setter
+    def compatibility(self, new_value: bool):
+        self._compatibility = new_value
 
     @property
     def filters(self) -> list:
@@ -457,7 +481,7 @@ class BeaconSpace:
         has_membership: bool = self.get_partial_member(server) is not None
 
         # Check for ownership
-        has_ownership: bool = server.id == self.private_owner_id
+        has_ownership: bool = server.id == self.owner_id
 
         return has_membership or has_ownership
 
@@ -466,13 +490,13 @@ class BeaconSpace:
             "id": self.id,
             "name": self.name,
             "emoji": self.emoji,
+            "owner_id": self._owner_id,
+            "owner_platform": self._owner_platform,
             "members": self.partial_members.copy(),
             "invites": self.invites.copy(),
             "bans": self.bans.copy(),
             "options": {
                 "private": self.private,
-                "private_owner_id": self._private_owner_id,
-                "private_owner_platform": self._private_owner_platform,
                 "nsfw": self.nsfw,
                 "relay_deletes": self.relay_deletes,
                 "relay_edits": self.relay_edits,
