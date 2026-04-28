@@ -100,6 +100,9 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
             elif len(ctx.value) == 0:
                 matches.append(f"{space.name} ({space.id})")
 
+        if len(ctx.value) > 0:
+            matches.append(ctx.value)
+
         all_matches: list[str] = priority_matches + matches
 
         return [

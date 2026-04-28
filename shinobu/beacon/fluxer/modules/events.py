@@ -165,6 +165,10 @@ class FluxerEvents(cog.Cog):
         # Get the BeaconMessage object for the message
         message_obj: beacon_message.BeaconMessage = beacon_obj.messages.get_message(str(message.id))
 
+        if not message_obj:
+            # Message isn't cached
+            return
+
         # Did we bridge this message?
         if message.webhook_id:
             if message_obj.author.id != str(message.webhook_id):
