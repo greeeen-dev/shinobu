@@ -48,6 +48,8 @@ class BeaconMessageCache:
                     self._data.pop(message.id, None)
 
             self._data_groups.update({message.id: message})
+        else:
+            self._data.update({message.id: message})
 
         # Save data
         if save:

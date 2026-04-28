@@ -40,6 +40,7 @@ class StoatBot(stoat_commands.Bot):
         self._colors: colors.Colors = colors.Colors()
         self.owner_id: str | None = owner_id # imagine having @commands.is_owner() but not Bot.owner_id. how "suckless"
         self.owner_ids: list = [owner_id] if owner_id else []
+        self.chunker: chunking.MemberChunker | None = None
 
         # Notification on whether the event handlers are working or not
         self.messages_working_notif: bool = False
@@ -305,11 +306,14 @@ class StoatBot(stoat_commands.Bot):
         except beacon.BeaconPlatformDisabled:
             pass
 
-    async def on_ready(self, _, /):
+    async def on_ready(self, event: stoat.ReadyEvent):
         print(f"Logged in to Stoat as {self.user.name}#{self.user.discriminator} ({self.user.id})")
 
-        # Induce artificial delay to wait for servers to load
-        await asyncio.sleep(1)
+        # We'll update the cache ourselves to ensure Beacon can properly get platform data
+        for server in event.servers:
+            self.state.cache.store_server(server, event.cache_context)
+        for channel in event.channels:
+            self.state.cache.store_channel(channel, event.cache_context)
 
         # noinspection PyUnresolvedReferences
         self.register_driver()
@@ -554,6 +558,7 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
                         token=token
                     )
                     self.stoat_chunker = chunking.MemberChunker(self.stoat_bot)
+                    self.stoat_bot.chunker = self.stoat_chunker
                     self._driver.replace_bot(self.stoat_bot)
 
                 # Load extensions
