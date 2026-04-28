@@ -80,7 +80,7 @@ class Beacon:
         self._debug: bool = False
 
         # Get data
-        self._data: dict = self.__wrapper.read_json("beacon").get("raw", {})
+        self._data: dict = {}
 
         # Create message ID reservations
         self._pending: dict = {}
@@ -230,6 +230,9 @@ class Beacon:
 
         # Get cache from wrapper
         cache: dict = self.__wrapper.read_json("cache")
+
+        # Load raw data
+        self._data = data.get("raw", {})
 
         # Load spaces
         for space_id, space_data in data.get("spaces", {}).items():
