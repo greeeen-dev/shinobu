@@ -88,12 +88,12 @@ class StoatBeaconContentBlockConverter:
 
 class StoatBeaconFilesConverter:
     @staticmethod
-    def file(file: beacon_file.BeaconFile) -> stoat.ResolvableResource:
-        return file.data
+    def file(file: beacon_file.BeaconFile) -> tuple[str, stoat.ResolvableResource]:
+        return file.filename, file.data
 
     @staticmethod
-    def files(files: list[beacon_file.BeaconFile]) -> list[stoat.ResolvableResource]:
-        return [file.data for file in files]
+    def files(files: list[beacon_file.BeaconFile]) -> list[tuple[str, stoat.ResolvableResource]]:
+        return [(file.filename, file.data) for file in files]
 
 class StoatDriver(beacon_driver.BeaconDriver):
     def __init__(self, bot, message_cache: beacon_messages.BeaconMessageCache,
