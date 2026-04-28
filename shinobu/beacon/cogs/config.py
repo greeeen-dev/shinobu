@@ -169,6 +169,9 @@ class BeaconConfig(shinobu_cog.ShinobuCog):
                 break
 
             def check(incoming: discord.Interaction):
+                if not incoming.message:
+                    return False
+
                 return incoming.user.id == ctx.author.id and incoming.message.id == message.id
 
             try:

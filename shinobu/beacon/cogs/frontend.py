@@ -117,8 +117,8 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
         # Create new list UI
         list_ui: ui_kit.ShinobuListDiscordView = ui_kit.ShinobuListDiscordView(
-            "Available Spaces",
-            "Available Spaces",
+            ":house: available spaces",
+            "This is a list of all Spaces your server can access.",
             self.bot.colors.shinobu,
             allow_hidden=ctx.user.id == self.bot.owner_id
         )
