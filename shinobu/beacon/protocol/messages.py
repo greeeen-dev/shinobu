@@ -41,18 +41,13 @@ class BeaconMessageCache:
             raise ValueError("Message already cached")
 
         if type(message) is beacon_message.BeaconMessageGroup:
-            if len(self._data_groups.keys()) > self.cache_limit:
+            while len(self._data_groups.keys()) >= self.cache_limit:
                 message_group: beacon_message.BeaconMessageGroup = self._data_groups.pop(next(iter(self._data_groups)))
 
                 for message in message_group.messages:
                     self._data.pop(message.id, None)
 
             self._data_groups.update({message.id: message})
-        else:
-            if len(self._data.keys()) > self.cache_limit:
-                self._data.pop(next(iter(self._data)))
-
-            self._data.update({message.id: message})
 
         # Save data
         if save:
