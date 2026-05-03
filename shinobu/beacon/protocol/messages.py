@@ -45,7 +45,10 @@ class BeaconMessageCache:
                 message_group: beacon_message.BeaconMessageGroup = self._data_groups.pop(next(iter(self._data_groups)))
 
                 for message in message_group.messages:
-                    self._data.pop(message.id, None)
+                    if type(message) is str:
+                        self._data.pop(message, None)
+                    else:
+                        self._data.pop(message.id, None)
 
             self._data_groups.update({message.id: message})
         else:
