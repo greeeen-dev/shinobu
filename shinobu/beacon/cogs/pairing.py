@@ -21,10 +21,10 @@ import uuid
 from discord.ext import bridge
 from shinobu.runtime.models import shinobu_cog
 from shinobu.beacon.utils.checks import CommandChecks
-from shinobu.beacon.protocol import beacon, pairing as beacon_pairing
-from shinobu.beacon.models import server as beacon_server, driver as beacon_driver
+from shinobu.beacon.protocol import pairing as beacon_pairing
+from shinobu.beacon.models import server as beacon_server, driver as beacon_driver, beacon_cog
 
-class BeaconPairing(shinobu_cog.ShinobuCog):
+class BeaconPairing(beacon_cog.BeaconCog):
     def __init__(self, bot):
         # Register cog metadata
         super().__init__(
@@ -37,15 +37,13 @@ class BeaconPairing(shinobu_cog.ShinobuCog):
             )
         )
 
-        # Get Beacon
-        self._beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
-
     @bridge.bridge_group(name="pairing")
     async def pairing_universal(self, ctx):
         # Universal command group.
         pass
 
     @pairing_universal.command(name="pair-server")
+    @bridge.bridge_option("code", description="The pairing code. Leave empty to create a pairing code.")
     @CommandChecks.can_manage()
     async def pair_server(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
                           code: str | None = None):

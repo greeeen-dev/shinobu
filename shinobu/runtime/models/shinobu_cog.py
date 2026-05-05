@@ -16,6 +16,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
+import asyncio
+import discord
 from discord.ext import commands, bridge
 from shinobu.runtime.secrets import fine_grained
 
@@ -77,3 +79,18 @@ class ShinobuCog(commands.Cog):
     @property
     def files(self) -> fine_grained.FineGrainedSecureFiles:
         return self._shinobu_files
+
+    async def confirm_danger(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
+                             message: discord.Message) -> tuple[bool, discord.Interaction | None]:
+        def check(incoming: discord.Interaction):
+            if not incoming.message:
+                return False
+
+            return incoming.user.id == ctx.author.id and incoming.message.id == message.id
+
+        try:
+            interaction: discord.Interaction = await self.bot.wait_for("interaction", check=check, timeout=120)
+        except asyncio.TimeoutError:
+            return False, None
+
+        return interaction.custom_id == "danger_confirm", interaction

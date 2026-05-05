@@ -16,7 +16,11 @@ class CommandChecks:
     def is_admin():
         async def predicate(ctx):
             beacon: beacon_protocol.Beacon = get_beacon(ctx.bot)
-            return beacon.moderators.is_admin(str(get_user(ctx).id)) or get_user(ctx).id == ctx.bot.owner_id
+            return (
+                beacon.moderators.is_admin(str(get_user(ctx).id)) or
+                get_user(ctx).id == ctx.bot.owner_id or
+                get_user(ctx).id in ctx.bot.owner_ids
+            )
 
         return commands.check(predicate)
 
@@ -24,7 +28,11 @@ class CommandChecks:
     def is_moderator():
         async def predicate(ctx):
             beacon: beacon_protocol.Beacon = get_beacon(ctx.bot)
-            return beacon.moderators.is_moderator(str(get_user(ctx).id)) or get_user(ctx).id == ctx.bot.owner_id
+            return (
+                beacon.moderators.is_moderator(str(get_user(ctx).id)) or
+                get_user(ctx).id == ctx.bot.owner_id or
+                get_user(ctx).id in ctx.bot.owner_ids
+            )
 
         return commands.check(predicate)
 
@@ -36,7 +44,8 @@ class CommandChecks:
                 beacon.moderators.is_moderator(str(get_user(ctx).id)) or
                 get_user(ctx).guild_permissions.manage_messages or
                 get_user(ctx).guild_permissions.ban_members or
-                get_user(ctx).id == ctx.bot.owner_id
+                get_user(ctx).id == ctx.bot.owner_id or
+                get_user(ctx).id in ctx.bot.owner_ids
             )
 
         return commands.check(predicate)
@@ -50,7 +59,8 @@ class CommandChecks:
             return (
                 beacon.moderators.is_moderator(str(get_user(ctx).id)) or
                 get_user(ctx).guild_permissions.ban_members or
-                get_user(ctx).id == ctx.bot.owner_id
+                get_user(ctx).id == ctx.bot.owner_id or
+                get_user(ctx).id in ctx.bot.owner_ids
             )
 
         return commands.check(predicate)
@@ -64,7 +74,8 @@ class CommandChecks:
             return (
                 beacon.moderators.is_moderator(str(get_user(ctx).id)) or
                 get_user(ctx).guild_permissions.manage_channels or
-                get_user(ctx).id == ctx.bot.owner_id
+                get_user(ctx).id == ctx.bot.owner_id or
+                get_user(ctx).id in ctx.bot.owner_ids
             )
 
         return commands.check(predicate)

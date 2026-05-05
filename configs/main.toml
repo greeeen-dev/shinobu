@@ -1,5 +1,4 @@
 [system]
-owner_id = -1
 admin_ids = []
 restart_on_crash = true
 
@@ -10,3 +9,7 @@ enabled_platforms = [
     "stoat",
     "fluxer",
 ]
+enable_private_spaces = true
+enable_public_spaces = true
+enable_agegated_spaces = false
+max_spaces_per_server = 10

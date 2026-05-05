@@ -38,3 +38,7 @@ class BeaconChannel(messageable.BeaconMessageable):
     @property
     def nsfw(self) -> bool:
         return self._nsfw
+
+    @nsfw.setter
+    def nsfw(self, new_state: bool):
+        self._nsfw = new_state

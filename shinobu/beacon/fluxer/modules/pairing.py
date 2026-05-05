@@ -35,8 +35,9 @@ class BeaconPairing(cog.Cog):
     @cog.Cog.command(name="pair-server")
     async def pair_server(self, ctx: fluxer.Message, code: str | None = None):
         """Pairs a server with other servers to enable more bridge features."""
-        
-        if ctx.author.id != 1472271558005039139:
+
+        # noinspection PyUnresolvedReferences
+        if not self.bot.is_owner(ctx.author):
             return
 
         fluxer_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("fluxer")
@@ -50,6 +51,7 @@ class BeaconPairing(cog.Cog):
                 await ctx.reply("not a valid pairing code :c")
 
             # Revoke pairing code
+            # noinspection DuplicatedCode
             self._beacon.pairing.revoke_pairing_code(code)
 
             # Pair servers
@@ -77,6 +79,7 @@ class BeaconPairing(cog.Cog):
             else:
                 self._beacon.pairing.update_pairing(pairing.id)
 
+            # noinspection PyUnresolvedReferences
             embed: fluxer.Embed = fluxer.Embed(
                 title="\U00002705 servers paired!",
                 description=f"Your server is now paired with **{len(pairing.servers) - 1}** other server(s).",
@@ -100,6 +103,7 @@ class BeaconPairing(cog.Cog):
             code: str = self._beacon.pairing.new_pairing_code(server)
 
             try:
+                # noinspection PyUnresolvedReferences
                 embed: fluxer.Embed = fluxer.Embed(
                     title="your pairing code is here \U0001F440",
                     description=(
@@ -124,7 +128,8 @@ class BeaconPairing(cog.Cog):
     async def unpair_server(self, ctx: fluxer.Message):
         """Unpairs the server from its current pairing."""
 
-        if ctx.author.id != 1472271558005039139:
+        # noinspection PyUnresolvedReferences,DuplicatedCode
+        if not self.bot.is_owner(ctx.author):
             return
 
         fluxer_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("fluxer")
@@ -138,6 +143,7 @@ class BeaconPairing(cog.Cog):
         pairing.remove_server(server)
         self._beacon.pairing.remove_server_mapping(server.id)
 
+        # noinspection PyUnresolvedReferences
         embed: fluxer.Embed = fluxer.Embed(
             title="\U00002705 server unpaired!",
             description=f"Your server is no longer paired with Pairing `{pairing.id}`.",
@@ -153,7 +159,8 @@ class BeaconPairing(cog.Cog):
     async def pair_info(self, ctx: fluxer.Message):
         """Shows information about the server's current pairing."""
 
-        if ctx.author.id != 1472271558005039139:
+        # noinspection PyUnresolvedReferences,DuplicatedCode
+        if not self.bot.is_owner(ctx.author):
             return
 
         fluxer_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("fluxer")
@@ -165,6 +172,7 @@ class BeaconPairing(cog.Cog):
 
         pairing: beacon_pairing.BeaconPairing = self._beacon.pairing.get_pairing(server.pairing)
 
+        # noinspection PyUnresolvedReferences
         embed: fluxer.Embed = fluxer.Embed(
             title="\U00002139\U0000FE0F pairing info",
             color=self.bot.colors.shinobu

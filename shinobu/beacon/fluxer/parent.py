@@ -18,6 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import traceback
+import tomllib
 import fluxer
 from discord.ext import commands
 from shinobu.runtime.models import shinobu_cog, colors
@@ -27,10 +28,16 @@ from shinobu.beacon.models import driver as beacon_driver
 
 class FluxerBot(fluxer.Bot):
     def __init__(self, beacon_obj: beacon.Beacon, driver_obj: fluxer_driver.FluxerDriver, *args, **kwargs):
+        owner_id: int | None = None
+
+        if "owner_id" in kwargs:
+            owner_id = kwargs.pop("owner_id")
+
         super().__init__(*args, **kwargs)
         self._beacon: beacon.Beacon = beacon_obj
         self._driver: fluxer_driver.FluxerDriver = driver_obj
         self._colors: colors.Colors = colors.Colors()
+        self._owner_id: int | None = owner_id
 
     def register_driver(self):
         if "fluxer" in self._beacon.drivers.platforms:
@@ -38,6 +45,16 @@ class FluxerBot(fluxer.Bot):
             return
 
         self._beacon.drivers.register_driver("fluxer", self._driver)
+
+    @property
+    def owner_id(self) -> int | None:
+        return self.owner_id
+
+    def is_owner(self, user: fluxer.User) -> bool:
+        if not self.owner_id:
+            return False
+
+        return user.id == self.owner_id
 
     @property
     def beacon(self) -> beacon.Beacon:
@@ -89,6 +106,15 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
         # Restart status
         self._restart: bool = False
 
+        # Get config
+        self._config: dict = {}
+
+        try:
+            with open("configs/fluxer.toml", "rb") as file:
+                self._config = tomllib.load(file)
+        except (FileNotFoundError, tomllib.TOMLDecodeError):
+            pass
+
     @property
     def beacon(self) -> beacon.Beacon:
         return self._beacon
@@ -118,11 +144,14 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                 # noinspection PyProtectedMember
                 bot_needs_open: bool = (self.fluxer_bot is None) or (self.fluxer_bot._closed if self.fluxer_bot else False)
                 if bot_needs_open:
+                    owner_id: str | None = self._config.get("system").get("owner_id")
+
                     # Create new bot
                     self.fluxer_bot: FluxerBot | fluxer.Bot = FluxerBot(
                         self._beacon,
                         self._driver,
-                        command_prefix=self.bot.command_prefix
+                        command_prefix=self.bot.command_prefix,
+                        owner_id=int(owner_id) if owner_id else None
                     )
 
                     self._driver.replace_bot(self.fluxer_bot)

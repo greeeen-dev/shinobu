@@ -136,47 +136,89 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
         pairing: beacon_pairing.BeaconPairing = self._pairing.get_pairing_for_server(str(server.id), self.platform)
 
-        return beacon_server.BeaconServer(
-            server_id=str(server.id),
-            platform=self.platform,
-            name=server.name,
-            emojis=emojis,
-            pairing=pairing.id if pairing else None
-        )
+        # Get cached server
+        cached_server: beacon_server.BeaconServer | None = self.objects.get_object(str(server.id))
+
+        if cached_server:
+            cached_server.name = server.name
+            cached_server.emojis = emojis
+            return cached_server
+        else:
+            new_server: beacon_server.BeaconServer = beacon_server.BeaconServer(
+                server_id=str(server.id),
+                platform=self.platform,
+                name=server.name,
+                emojis=emojis,
+                pairing=pairing.id if pairing else None
+            )
+            self.objects.store_object(new_server)
+            return new_server
 
     def _to_beacon_channel(self, channel: fluxer.Channel) -> beacon_channel.BeaconChannel:
         server = self.get_server(str(channel.guild_id))
 
-        return beacon_channel.BeaconChannel(
-            channel_id=str(channel.id),
-            platform=self.platform,
-            name=channel.name,
-            server=server,
-            nsfw=channel.nsfw
-        )
+        # Get cached channel
+        cached_channel: beacon_channel.BeaconChannel | None = self.objects.get_object(str(channel.id))
+
+        if cached_channel:
+            cached_channel.name = channel.name
+            cached_channel.nsfw = channel.nsfw
+            return cached_channel
+        else:
+            new_channel: beacon_channel.BeaconChannel = beacon_channel.BeaconChannel(
+                channel_id=str(channel.id),
+                platform=self.platform,
+                name=channel.name,
+                server=server,
+                nsfw=channel.nsfw
+            )
+            self.objects.store_object(new_channel)
+            return new_channel
 
     def _to_beacon_user(self, user: fluxer.User) -> beacon_user.BeaconUser:
-        return beacon_user.BeaconUser(
-            user_id=str(user.id),
-            platform=self.platform,
-            name=user.username,
-            display_name=user.global_name,
-            avatar_url=user.avatar_url
-        )
+        # Get cached user
+        cached_user: beacon_user.BeaconUser | None = self.objects.get_object(str(user.id))
+
+        if cached_user:
+            cached_user.name = user.username
+            cached_user.display_name = user.global_name
+            cached_user.avatar_url = user.avatar_url
+            return cached_user
+        else:
+            new_user: beacon_user.BeaconUser = beacon_user.BeaconUser(
+                user_id=str(user.id),
+                platform=self.platform,
+                name=user.username,
+                display_name=user.display_name,
+                avatar_url=user.avatar_url
+            )
+            self.objects.store_object(new_user)
+            return new_user
 
     def _to_beacon_member(self, member: fluxer.GuildMember, server: fluxer.Guild) -> beacon_member.BeaconMember:
         # Because fluxer.py doesn't add a way to get a member's server ID,
         # we'll need to process it separately
         server = self._to_beacon_server(server)
 
-        return beacon_member.BeaconMember(
-            user_id=str(member.user.id),
-            platform=self.platform,
-            name=member.user.username,
-            server=server,
-            display_name=member.user.global_name,
-            avatar_url=member.user.avatar_url
-        )
+        # Get cached member
+        cached_member: beacon_member.BeaconMember | None = self.objects.get_object(str(member.id))
+
+        if cached_member:
+            cached_member.name = member.user.username
+            cached_member.display_name = member.user.global_name
+            cached_member.avatar_url = member.user.avatar_url
+            return cached_member
+        else:
+            new_member: beacon_member.BeaconMember = beacon_member.BeaconMember(
+                user_id=str(member.user.id),
+                platform=self.platform,
+                name=member.user.username,
+                server=server,
+                display_name=member.user.global_name,
+                avatar_url=member.user.avatar_url
+            )
+            self.objects.store_object(new_member)
+            return new_member
 
     def _to_beacon_message(self, message: fluxer.Message) -> beacon_message.BeaconMessage:
         server = self.get_server(str(message.guild_id))

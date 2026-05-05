@@ -16,7 +16,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-from shinobu.beacon.models import space as beacon_space, channel as beacon_channel
+from shinobu.beacon.models import space as beacon_space, channel as beacon_channel, server as beacon_server
 
 class BeaconSpaceIsPrivate(Exception):
     pass
@@ -31,6 +31,7 @@ class BeaconSpaceManager:
     def __init__(self, allow_private_spaces: bool = False):
         self._scheme_version: int = 1
         self._spaces: dict[str, beacon_space.BeaconSpace] = {}
+        self._server_spaces: dict[str, dict[str, list[str]]] = {}
         self._invite_mapping: dict[str, str] = {}
         self._allow_private_spaces: bool = allow_private_spaces
 
@@ -65,6 +66,16 @@ class BeaconSpaceManager:
         for invite in space.invites:
             self._invite_mapping.update({invite.code: space.id})
 
+        # Add space to server spaces mapping
+        if space.owner_id and space.owner_platform:
+            if not space.owner_platform in self._server_spaces:
+                self._server_spaces.update({space.owner_platform: {}})
+
+            if not space.owner_id in self._server_spaces[space.owner_platform]:
+                self._server_spaces[space.owner_platform].update({space.owner_id: []})
+
+            self._server_spaces[space.owner_platform][space.owner_id].append(space.id)
+
     def add_spaces(self, spaces: list[beacon_space.BeaconSpace], creating: bool = False):
         """Adds Spaces to Beacon."""
 
@@ -84,8 +95,59 @@ class BeaconSpaceManager:
 
         return None
 
+    def get_space_for_invite(self, invite: beacon_space.BeaconSpaceInvite) -> beacon_space.BeaconSpace | None:
+        return self.get_space(invite.space_id) if invite.space_id else None
+
+    def get_server_spaces(self, server: beacon_server.BeaconServer) -> list[str]:
+        """Returns a list of IDs of Spaces owned by the server."""
+        return self._server_spaces.get(server.platform, {}).get(server.id, [])
+
+    def get_invite(self, code: str) -> beacon_space.BeaconSpaceInvite | None:
+        space_id: str | None = self._invite_mapping.get(code)
+
+        if not space_id:
+            return
+
+        space: beacon_space.BeaconSpace | None = self.get_space(space_id)
+
+        if not space:
+            return
+
+        invite: beacon_space.BeaconSpaceInvite | None = space.get_invite(code)
+
+        if not invite:
+            return
+
+        if invite.expired:
+            self.revoke_invite(space, invite.code)
+            return
+
+        return invite
+
+    def revoke_invite(self, space: beacon_space.BeaconSpace, code: str):
+        invite: beacon_space.BeaconSpaceInvite | None = space.get_invite(code)
+
+        if invite:
+            space.invites.remove(invite)
+
+        self._invite_mapping.pop(code, None)
+
+
     def delete_space(self, space_id: str):
-        self._spaces.pop(space_id)
+        space: beacon_space.BeaconSpace = self._spaces.pop(space_id)
+        space.delete()
+
+        if space.owner_id and space.owner_platform:
+            if not space.owner_platform in self._server_spaces:
+                return
+
+            if not space.owner_id in self._server_spaces[space.owner_platform]:
+                return
+
+            try:
+                self._server_spaces[space.owner_platform][space.owner_id].remove(space.id)
+            except ValueError:
+                pass
 
     def to_dict(self) -> dict:
         data = {}

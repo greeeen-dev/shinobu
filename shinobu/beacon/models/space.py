@@ -41,6 +41,7 @@ class BeaconSpaceInvite:
         self._expiry: int = expiry
         self._max_uses: int = max_uses
         self._used: int = used
+        self._space_id: str | None = None
 
     @property
     def code(self) -> str:
@@ -59,6 +60,10 @@ class BeaconSpaceInvite:
         return self._used
 
     @property
+    def space_id(self) -> str:
+        return self._space_id
+
+    @property
     def expired(self):
         return self.expiry <= time.time() or (
             self.uses >= self.max_uses if self.max_uses > 0 else False
@@ -72,6 +77,12 @@ class BeaconSpaceInvite:
 
     def use_invite(self):
         self._used += 1
+
+    def set_space_id(self, space_id: str):
+        if self._space_id:
+            return
+
+        self._space_id = space_id
 
     def to_dict(self) -> dict:
         if self.expired:
@@ -190,21 +201,23 @@ class BeaconSpaceMember:
         }
 
 class BeaconSpace:
-    def __init__(self, space_id: str, space_name: str, space_emoji: str | None = None, members: list | None = None,
-                 partial_members: list| None = None, invites: list | None = None, bans: list | None = None,
-                 private: bool = False, nsfw: bool = False, owner_id: str | None = None,
-                 owner_platform: str | None = None, relay_deletes: bool = True, relay_edits: bool = True,
-                 relay_pins: bool = False, relay_large_attachments: bool = True, compatibility: bool = False,
-                 filters: list | None = None, filter_configs: dict | None = None):
+    def __init__(self, space_id: str, space_name: str, space_description: str | None = None,
+                 space_emoji: str | None = None, members: list | None = None, partial_members: list| None = None,
+                 invites: list | None = None, bans: list | None = None, private: bool = False, nsfw: bool = False,
+                 owner_id: str | None = None, owner_platform: str | None = None, relay_deletes: bool = True,
+                 relay_edits: bool = True, relay_pins: bool = False, relay_large_attachments: bool = True,
+                 compatibility: bool = False, filters: list | None = None, filter_configs: dict | None = None):
         self._id: str = space_id
         self._name: str = space_name
-        self._emoji: str = space_emoji
+        self._description: str | None = space_description
+        self._emoji: str | None = space_emoji
         self._owner_id: str | None = owner_id
         self._owner_platform: str | None = owner_platform
         self._members: list[BeaconSpaceMember] = members or []
         self._partial_members: list[BeaconPartialSpaceMember] = partial_members or []
         self._invites: list[BeaconSpaceInvite] = invites or []
         self._bans: list[str] = bans or []
+        self._deleted: bool = False
 
         # Room options
         self._private: bool = private
@@ -217,6 +230,9 @@ class BeaconSpace:
         self._filters: list = filters or []
         self._filter_configs: dict = filter_configs or {}
 
+        for invite in self._invites:
+            invite.set_space_id(self.id)
+
     @property
     def id(self) -> str:
         return self._id
@@ -225,9 +241,36 @@ class BeaconSpace:
     def name(self) -> str:
         return self._name
 
+    @name.setter
+    def name(self, new_name: str):
+        self._name = new_name
+
     @property
-    def emoji(self) -> str:
+    def description(self) -> str | None:
+        return self._description
+
+    @description.setter
+    def description(self, new_description: str | None):
+        self._description = new_description
+
+    @property
+    def quoted_description(self) -> str | None:
+        if not self._description:
+            return None
+
+        lines: list[str] = self._description.split("\n")
+        for index in range(len(lines)):
+            lines[index] = "> " + lines[index]
+
+        return "\n".join(lines)
+
+    @property
+    def emoji(self) -> str | None:
         return self._emoji
+
+    @emoji.setter
+    def emoji(self, new_emoji: str | None):
+        self._emoji = new_emoji
 
     @property
     def decorated_name(self) -> str:
@@ -264,6 +307,10 @@ class BeaconSpace:
     @property
     def nsfw(self) -> bool:
         return self._nsfw
+
+    @nsfw.setter
+    def nsfw(self, new_value: bool):
+        self._nsfw = new_value
 
     @property
     def relay_deletes(self) -> bool:
@@ -312,6 +359,10 @@ class BeaconSpace:
     @property
     def filter_configs(self) -> dict:
         return self._filter_configs
+
+    @property
+    def deleted(self) -> bool:
+        return self._deleted
 
     def add_invite(self, invite: BeaconSpaceInvite):
         self._invites.append(invite)
@@ -436,6 +487,13 @@ class BeaconSpace:
                 raise BeaconSpaceNotJoined("Server is not in this Space")
 
     def ban(self, member: BeaconSpaceMember | BeaconPartialSpaceMember | str):
+        if isinstance(member, str):
+            # Try to get partial member
+            possible_partial_member: BeaconPartialSpaceMember | None = self.get_partial_member(member)
+
+            if possible_partial_member:
+                member = possible_partial_member
+
         if isinstance(member, BeaconSpaceMember) or isinstance(member, BeaconPartialSpaceMember):
             try:
                 self.leave(member)
@@ -449,11 +507,14 @@ class BeaconSpace:
     def unban(self, server_id: str):
         self._bans.remove(server_id)
     
-    def get_member(self, server: beacon_server.BeaconServer) -> BeaconSpaceMember | None:
+    def get_member(self, server: beacon_server.BeaconServer | str) -> BeaconSpaceMember | None:
         """Gets a Space member."""
 
+        if isinstance(server, beacon_server.BeaconServer):
+            server = server.id
+
         filtered_members: list[BeaconSpaceMember] = [
-            member for member in self._members if member.server_id == server.id
+            member for member in self._members if member.server_id == server
         ]
 
         if len(filtered_members) > 0:
@@ -476,6 +537,15 @@ class BeaconSpace:
 
         return None
 
+    def get_invite(self, code: str) -> BeaconSpaceInvite | None:
+        """Gets a beacon invite."""
+
+        for invite in self.invites:
+            if invite.code == code:
+                return invite
+
+        return None
+
     def has_access(self, server: beacon_server.BeaconServer) -> bool:
         # Check for membership
         has_membership: bool = self.get_partial_member(server) is not None
@@ -485,10 +555,15 @@ class BeaconSpace:
 
         return has_membership or has_ownership
 
+    def delete(self):
+        """Sets the deleted flag to true."""
+        self._deleted = True
+
     def to_dict(self) -> dict:
         data = {
             "id": self.id,
             "name": self.name,
+            "description": self.description,
             "emoji": self.emoji,
             "owner_id": self._owner_id,
             "owner_platform": self._owner_platform,

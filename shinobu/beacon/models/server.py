@@ -33,6 +33,10 @@ class BeaconServer(abc.BeaconABC):
     def name(self) -> str:
         return self._name
 
+    @name.setter
+    def name(self, new_name: str):
+        self._name = new_name
+
     @property
     def filesize_limit(self) -> int | None:
         return self._filesize_limit
@@ -40,6 +44,10 @@ class BeaconServer(abc.BeaconABC):
     @property
     def emojis(self) -> list[beacon_emoji.BeaconEmoji]:
         return self._emojis
+
+    @emojis.setter
+    def emojis(self, new_emojis: list[beacon_emoji.BeaconEmoji]):
+        self._emojis = new_emojis
 
     @property
     def pairing(self) -> str | None:

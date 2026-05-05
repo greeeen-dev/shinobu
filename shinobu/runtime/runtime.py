@@ -65,6 +65,7 @@ class ShinobuBot(bridge.Bot):
 
         # Load configs
         self._config: dict = {}
+
         try:
             with open("configs/main.toml", "rb") as file:
                 self._config = tomllib.load(file)

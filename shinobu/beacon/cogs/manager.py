@@ -18,9 +18,9 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 from discord.ext import commands
 from shinobu.runtime.models import shinobu_cog
-from shinobu.beacon.protocol import beacon
+from shinobu.beacon.models import beacon_cog
 
-class BeaconManager(shinobu_cog.ShinobuCog):
+class BeaconManager(beacon_cog.BeaconCog):
     def __init__(self, bot):
         # Register cog metadata
         super().__init__(
@@ -32,9 +32,6 @@ class BeaconManager(shinobu_cog.ShinobuCog):
                 visible_in_help=True
             )
         )
-
-        # Get Beacon
-        self._beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
 
     @commands.group(name='beacon')
     async def beacon_text(self, ctx):

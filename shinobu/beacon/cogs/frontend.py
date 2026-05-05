@@ -21,12 +21,11 @@ import discord
 from functools import partial
 from discord.ext import commands, bridge
 from shinobu.runtime.models import shinobu_cog, ui_kit
-from shinobu.beacon.protocol import beacon
 from shinobu.beacon.models import (space as beacon_space, driver as beacon_driver, server as beacon_server,
-                                   channel as beacon_channel, webhook as beacon_webhook)
-from shinobu.runtime.models.ui_kit import ShinobuListEntry
+                                   channel as beacon_channel, webhook as beacon_webhook, beacon_cog)
+from shinobu.beacon.utils.checks import CommandChecks
 
-class BeaconFrontend(shinobu_cog.ShinobuCog):
+class BeaconFrontend(beacon_cog.BeaconCog):
     def __init__(self, bot):
         # Register cog metadata
         super().__init__(
@@ -39,9 +38,6 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
             )
         )
 
-        # Get Beacon
-        self._beacon: beacon.Beacon = self.bot.shared_objects.get("beacon")
-
     @bridge.bridge_group(name="bridge")
     async def bridge_universal(self, ctx):
         # Universal command group.
@@ -49,30 +45,48 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
     @bridge_universal.command(name="new-space")
     @bridge.bridge_option("name", description="The name of the space.")
-    @commands.is_owner() # Owner only for now for debugging purposes
-    async def new_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, *, name: str):
+    @commands.guild_only()
+    @CommandChecks.can_manage()
+    async def new_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, *, name: str,
+                        public: bool | None = None):
         """Creates a new Space."""
+
+        private_available: bool = (
+            self._beacon.can_create_private_space or
+            self.bot.owner_id == ctx.author.id or
+            ctx.author.id in self.bot.owner_ids
+        )
+        public_available: bool = (
+            self._beacon.can_create_public_space or
+            self.bot.owner_id == ctx.author.id or
+            ctx.author.id in self.bot.owner_ids
+        )
+
+        # Check if room creation is possible
+        if not public_available and not private_available:
+            return await ctx.respond("space creations are disabled :c", ephemeral=True)
+
+        if public is None:
+            # We'll go with whatever is available
+            if private_available:
+                public = False
+            elif public_available:
+                public = True
+
+        if public and not public_available:
+            return await ctx.respond("public space creations are disabled :c", ephemeral=True)
+        elif not public and not private_available:
+            return await ctx.respond("public space creations are disabled :c", ephemeral=True)
 
         new_space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
             space_id=str(uuid.uuid4()),
-            space_name=name
+            space_name=name,
+            private=not public,
+            owner_id=str(ctx.guild.id),
+            owner_platform="discord"
         )
         self._beacon.spaces.add_space(new_space)
         await ctx.respond(f"space created!\n- id: `{new_space.id}`\n- name: {new_space.name}")
-        await self.bot.loop.run_in_executor(None, self._beacon.save_data)
-
-    @bridge_universal.command(name="delete-space")
-    @bridge.bridge_option("space_id", description="The ID of the Space to delete.")
-    @commands.is_owner()  # Owner only for now for debugging purposes
-    async def delete_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
-        """Deletes a Space."""
-
-        try:
-            self._beacon.spaces.delete_space(space_id)
-        except KeyError:
-            return await ctx.respond("could not find space :c")
-
-        await ctx.respond(f"space deleted T.T")
         await self.bot.loop.run_in_executor(None, self._beacon.save_data)
 
     async def list_spaces_autocomplete(self, ctx: discord.AutocompleteContext) -> list[discord.OptionChoice]:
@@ -133,9 +147,10 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
                 # Check if we have access to this space
                 should_hide = not space.has_access(discord_driver.get_server(str(ctx.guild.id))) if ctx.guild else True
 
-            entry: ShinobuListEntry = ShinobuListEntry(
+            entry: ui_kit.ShinobuListEntry = ui_kit.ShinobuListEntry(
                 entry_id=space.id,
                 name=space.name,
+                description=space.description,
                 emoji=space.emoji,
                 hidden=should_hide
             )
@@ -144,21 +159,52 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
                 value=f"`{space.id}`"
             )
 
+            if space.private:
+                entry.add_field(
+                    name=":lock: Private Space",
+                    value="This Space is private. Servers will need a valid invite to join this Space."
+                )
+            else:
+                entry.add_field(
+                    name=":globe_with_meridians: Public Space",
+                    value="This Space is public. Servers can join this Space without an invite."
+                )
+
+            if space.nsfw:
+                entry.add_field(
+                    name=":underage: Age-gated space",
+                    value="This Space is marked as age-gated. Only age-gated channels may join and talk in this Space."
+                )
+
             list_ui.add_entry(entry)
 
         # Run loop
         await list_ui.run(self.bot, ctx, query=query)
 
     @bridge_universal.command(name="join-space")
-    @bridge.bridge_option("space_id", description="The ID or invite of the Space to join.")
-    @commands.is_owner()
+    @bridge.bridge_option("space_id", description="The ID or invite of the Space to join. An invite is required for private Spaces.")
+    @commands.guild_only()
+    @CommandChecks.can_manage()
     async def join_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
         """Joins a Space."""
 
         space: beacon_space.BeaconSpace | None = self._beacon.spaces.get_space(space_id)
+        can_override: bool = False
+        invite: beacon_space.BeaconSpaceInvite | None = None
+
+        if space.private:
+            # Check if we can override this
+            can_override = self.can_force_join(ctx.user.id)
 
         if not space:
-            return await ctx.respond("could not find space :c")
+            # Check if this is an invite
+            invite = self._beacon.spaces.get_invite(space_id)
+
+            if invite:
+                space = self._beacon.spaces.get_space_for_invite(invite)
+
+            if not space:
+                return await ctx.respond("could not find space :c")
 
         discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
 
@@ -184,7 +230,8 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
                 server=server_obj,
                 channel=channel_obj,
                 webhook=webhook_obj,
-                force=True
+                invite=invite,
+                force=can_override
             )
         except beacon_space.BeaconSpaceAlreadyJoined:
             return await ctx.respond("already in space? :/")
@@ -194,7 +241,8 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
 
     @bridge_universal.command(name="leave-space")
     @bridge.bridge_option("space_id", description="The ID of the Space to leave.")
-    @commands.is_owner()
+    @commands.guild_only()
+    @CommandChecks.can_manage()
     async def leave_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext, space_id: str):
         """Leaves a Space."""
 
@@ -238,6 +286,69 @@ class BeaconFrontend(shinobu_cog.ShinobuCog):
         # Delete webhook
         if webhook:
             await webhook.delete()
+
+    @bridge_universal.command(name="delete-space")
+    @bridge.bridge_option("space_id", description="The ID of the Space to delete.")
+    @CommandChecks.can_manage()
+    async def delete_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
+                           space_id: str):
+        """Shows options for a Space."""
+
+        # Get space
+        space: beacon_space.BeaconSpace | None = self._beacon.spaces.get_space(space_id)
+
+        if not self.can_manage(space, ctx.guild.id, user_id=ctx.author.id):
+            raise commands.CheckFailure()
+
+        embed: discord.Embed = discord.Embed(
+            title=":warning: ARE YOU SURE?",
+            description=f"This will delete {space.decorated_name} (`{space.id}`). Once it's gone, it's gone forever!",
+            color=self.bot.colors.warning
+        )
+        embed.set_footer(
+            text=f"If you need to edit the Space, use /config space-options space_id:{space.id} instead!"
+        )
+
+        view: discord.ui.View = discord.ui.View()
+        view.add_item(
+            discord.ui.ActionRow(
+                discord.ui.Button(
+                    label="I'm sure!",
+                    style=discord.ButtonStyle.red,
+                    custom_id="danger_confirm"
+                ),
+                discord.ui.Button(
+                    label="No thanks",
+                    style=discord.ButtonStyle.gray,
+                    custom_id="danger_backout"
+                )
+            )
+        )
+
+        result: discord.Message | discord.Interaction = await ctx.respond(embed=embed, view=view)
+
+        if isinstance(result, discord.Interaction):
+            message: discord.InteractionMessage = await result.original_response()
+        else:
+            message: discord.Message = result
+
+        confirmed, interaction = await self.confirm_danger(ctx, message)
+
+        if confirmed:
+            # Delete space
+            self._beacon.spaces.delete_space(space.id)
+
+            embed.title = ":wastebasket: Gone, reduced to atoms."
+            embed.description = f"{space.decorated_name} was deleted and is no more. It will be missed."
+            embed.colour = self.bot.colors.success
+            embed.set_footer(text=None)
+            await interaction.response.edit_message(embed=embed, view=None)
+            await self.bot.loop.run_in_executor(None, self._beacon.save_data)
+        else:
+            if interaction:
+                await interaction.response.edit_message(view=None)
+            else:
+                return await message.edit(view=None)
 
 def get_cog_type():
     return BeaconFrontend

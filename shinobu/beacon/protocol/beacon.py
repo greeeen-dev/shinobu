@@ -145,6 +145,22 @@ class Beacon:
     def debug(self) -> bool:
         return self._debug
 
+    @property
+    def can_create_private_space(self) -> bool:
+        return self._config.get("enable_private_spaces", True)
+
+    @property
+    def can_create_public_space(self) -> bool:
+        return self._config.get("enable_public_spaces", True)
+
+    @property
+    def allow_agegated_spaces(self) -> bool:
+        return self._config.get("enable_agegated_spaces", False)
+
+    @property
+    def max_spaces_per_server(self) -> int:
+        return self._config.get("max_spaces_per_server", 10)
+
     @staticmethod
     def bacon():
         """Bacon because I keep confusing beacon and bacon"""
@@ -239,6 +255,7 @@ class Beacon:
             space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
                 space_id=space_id,
                 space_name=space_data.get("name"),
+                space_description=space_data.get("description"),
                 space_emoji=space_data.get("emoji"),
                 private=space_data.get("options", {}).get("private"),
                 owner_id=space_data.get("owner_id", space_data.get("options", {}).get("private_owner_id")),

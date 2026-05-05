@@ -28,3 +28,7 @@ class BeaconMessageable(abc.BeaconABC):
     @property
     def name(self) -> str:
         return self._name
+
+    @name.setter
+    def name(self, new_name: str):
+        self._name = new_name

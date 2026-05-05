@@ -58,12 +58,24 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         error_title: str = "oh nooooo >.<"
         error_description: str = "An error occurred and the command failed to run. Sorry about that... :<"
 
+        if (
+                isinstance(error, discord.errors.ApplicationCommandInvokeError) or
+                isinstance(error, discord.ext.commands.CommandInvokeError)
+        ):
+            error = error.original
+
         # Handle expected errors
         if isinstance(error, commands.MissingRequiredArgument):
             error_title = "eh? 0.0"
             error_description = f"`{error.param.name}` is a required argument that is missing."
         elif isinstance(error, commands.CommandNotFound):
             return
+        elif isinstance(error, commands.NoPrivateMessage):
+            error_title = "ae :v"
+            error_description = "You can't run this command in Direct Messages."
+        elif isinstance(error, commands.PrivateMessageOnly):
+            error_title = "ae :v"
+            error_description = "You can't run this command in Servers."
         elif isinstance(error, commands.CheckFailure) or isinstance(error, discord.CheckFailure):
             error_title = "nu >:c"
             error_description = "You don't have the right permissions to run this command."

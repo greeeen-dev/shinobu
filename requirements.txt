@@ -13,3 +13,4 @@ aiohttp[speedups]
 argon2-cffi
 psutil
 git+https://github.com/greeeen-dev/capacitor.git
+emoji

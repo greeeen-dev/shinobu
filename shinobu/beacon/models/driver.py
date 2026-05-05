@@ -17,10 +17,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
 import time
+
 from shinobu.beacon.protocol import messages as beacon_messages, pairing as beacon_pairing
 from shinobu.beacon.models import (user as beacon_user, channel as beacon_channel, server as beacon_server,
                                    member as beacon_member, webhook as beacon_webhook, message as beacon_message,
-                                   messageable as beacon_messageable)
+                                   messageable as beacon_messageable, abc)
 
 class BeaconDriverUnsupported(Exception):
     def __init__(self):
@@ -33,6 +34,19 @@ class BeaconDriverPlatformMismatch(Exception):
 class BeaconDriverChannelMismatch(Exception):
     def __init__(self, expected: str, got: str):
         super().__init__(f"Expected channel ID {expected}, got {got}")
+
+class BeaconDriverObjectCache:
+    """Built-in driver object cache.
+    This is only for caching Beacon objects."""
+
+    def __init__(self):
+        self._data: dict[str, abc.BeaconABC] = {}
+
+    def store_object(self, beacon_object: abc.BeaconABC):
+        self._data.update({beacon_object.id: beacon_object})
+
+    def get_object(self, object_id: str) -> abc.BeaconABC | None:
+        return self._data.get(object_id, None)
 
 class BeaconDriverWebhookCache:
     """Built-in driver webhook cache.
@@ -76,6 +90,7 @@ class BeaconDriver:
     def __init__(self, platform: str, bot, message_cache: beacon_messages.BeaconMessageCache,
                  pairing: beacon_pairing.BeaconPairingManager):
         self._platform: str = platform
+        self._objects: BeaconDriverObjectCache = BeaconDriverObjectCache()
         self._webhooks: BeaconDriverWebhookCache = BeaconDriverWebhookCache()
         self._bot = bot
         self._messages: beacon_messages.BeaconMessageCache = message_cache
@@ -215,6 +230,10 @@ class BeaconDriver:
     @property
     def file_count_limit(self) -> int:
         return self._file_count_limit
+
+    @property
+    def objects(self) -> BeaconDriverObjectCache:
+        return self._objects
 
     @property
     def webhooks(self) -> BeaconDriverWebhookCache:

@@ -31,9 +31,17 @@ class BeaconPartialUser(messageable.BeaconMessageable):
     def display_name(self) -> str:
         return self._display_name or self._name
 
+    @display_name.setter
+    def display_name(self, new_name: str | None):
+        self._display_name = new_name
+
     @property
     def avatar_url(self) -> str | None:
         return self._avatar
+
+    @avatar_url.setter
+    def avatar_url(self, new_avatar: str | None):
+        self._avatar = new_avatar
 
     @property
     def bot(self) -> bool:
@@ -54,9 +62,17 @@ class BeaconUser(messageable.BeaconMessageable):
     def display_name(self) -> str:
         return self._display_name or self._name
 
+    @display_name.setter
+    def display_name(self, new_name: str | None):
+        self._display_name = new_name
+
     @property
     def avatar_url(self) -> str | None:
         return self._avatar
+
+    @avatar_url.setter
+    def avatar_url(self, new_avatar: str | None):
+        self._avatar = new_avatar
 
     @property
     def bot(self) -> bool:

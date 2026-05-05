@@ -215,46 +215,88 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         pairing: beacon_pairing.BeaconPairing = self._pairing.get_pairing_for_server(str(guild.id), self.platform)
 
-        return beacon_server.BeaconServer(
-            server_id=str(guild.id),
-            platform=self.platform,
-            name=guild.name,
-            filesize_limit=guild.filesize_limit,
-            emojis=emojis,
-            pairing=pairing.id if pairing else None
-        )
+        # Get cached server
+        cached_server: beacon_server.BeaconServer | None = self.objects.get_object(str(guild.id))
+
+        if cached_server:
+            cached_server.name = guild.name
+            cached_server.emojis = emojis
+            return cached_server
+        else:
+            new_server: beacon_server.BeaconServer = beacon_server.BeaconServer(
+                server_id=str(guild.id),
+                platform=self.platform,
+                name=guild.name,
+                filesize_limit=guild.filesize_limit,
+                emojis=emojis,
+                pairing=pairing.id if pairing else None
+            )
+            self.objects.store_object(new_server)
+            return new_server
 
     def _to_beacon_channel(self, channel: discord.TextChannel) -> beacon_channel.BeaconChannel:
         server = self._to_beacon_server(channel.guild)
 
-        return beacon_channel.BeaconChannel(
-            channel_id=str(channel.id),
-            platform=self.platform,
-            name=channel.name,
-            server=server,
-            nsfw=channel.nsfw
-        )
+        # Get cached channel
+        cached_channel: beacon_channel.BeaconChannel | None = self.objects.get_object(str(channel.id))
+
+        if cached_channel:
+            cached_channel.name = channel.name
+            cached_channel.nsfw = channel.nsfw
+            return cached_channel
+        else:
+            new_channel: beacon_channel.BeaconChannel = beacon_channel.BeaconChannel(
+                channel_id=str(channel.id),
+                platform=self.platform,
+                name=channel.name,
+                server=server,
+                nsfw=channel.nsfw
+            )
+            self.objects.store_object(new_channel)
+            return new_channel
 
     def _to_beacon_user(self, user: discord.User) -> beacon_user.BeaconUser:
-        return beacon_user.BeaconUser(
-            user_id=str(user.id),
-            platform=self.platform,
-            name=user.name,
-            display_name=user.display_name,
-            avatar_url=user.avatar.url if user.avatar else None
-        )
+        # Get cached user
+        cached_user: beacon_user.BeaconUser | None = self.objects.get_object(str(user.id))
+
+        if cached_user:
+            cached_user.name = user.name
+            cached_user.display_name = user.display_name
+            cached_user.avatar_url = user.avatar.url if user.avatar else None
+            return cached_user
+        else:
+            new_user: beacon_user.BeaconUser = beacon_user.BeaconUser(
+                user_id=str(user.id),
+                platform=self.platform,
+                name=user.name,
+                display_name=user.display_name,
+                avatar_url=user.avatar.url if user.avatar else None
+            )
+            self.objects.store_object(new_user)
+            return new_user
 
     def _to_beacon_member(self, member: discord.Member) -> beacon_member.BeaconMember:
         server = self._to_beacon_server(member.guild)
 
-        return beacon_member.BeaconMember(
-            user_id=str(member.id),
-            platform=self.platform,
-            name=member.name,
-            server=server,
-            display_name=member.display_name,
-            avatar_url=member.avatar.url if member.avatar else None
-        )
+        # Get cached member
+        cached_member: beacon_member.BeaconMember | None = self.objects.get_object(str(member.id))
+
+        if cached_member:
+            cached_member.name = member.name
+            cached_member.display_name = member.display_name
+            cached_member.avatar_url = member.avatar.url if member.avatar else None
+            return cached_member
+        else:
+            new_member: beacon_member.BeaconMember = beacon_member.BeaconMember(
+                user_id=str(member.id),
+                platform=self.platform,
+                name=member.name,
+                server=server,
+                display_name=member.display_name,
+                avatar_url=member.avatar.url if member.avatar else None
+            )
+            self.objects.store_object(new_member)
+            return new_member
 
     def _to_beacon_message(self, message: discord.Message) -> beacon_message.BeaconMessage:
         author = self._to_beacon_member(message.author)
