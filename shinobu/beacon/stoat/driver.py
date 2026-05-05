@@ -114,7 +114,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
         pairing: beacon_pairing.BeaconPairing = self._pairing.get_pairing_for_server(server.id, self.platform)
 
         # Get cached server
-        cached_server: beacon_server.BeaconServer | None = self.objects.get_object(server.id)
+        cached_server: beacon_server.BeaconServer | None = self.servers.get_object(server.id)
 
         if cached_server:
             cached_server.name = server.name
@@ -128,14 +128,14 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 emojis=emojis,
                 pairing=pairing.id if pairing else None
             )
-            self.objects.store_object(new_server)
+            self.servers.store_object(new_server)
             return new_server
 
     def _to_beacon_channel(self, channel: stoat.ServerChannel) -> beacon_channel.BeaconChannel:
         server = self._to_beacon_server(channel.server)
 
         # Get cached channel
-        cached_channel: beacon_channel.BeaconChannel | None = self.objects.get_object(channel.id)
+        cached_channel: beacon_channel.BeaconChannel | None = self.channels.get_object(channel.id)
 
         if cached_channel:
             cached_channel.name = channel.name
@@ -149,12 +149,12 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 server=server,
                 nsfw=channel.nsfw
             )
-            self.objects.store_object(new_channel)
+            self.channels.store_object(new_channel)
             return new_channel
 
     def _to_beacon_user(self, user: stoat.User) -> beacon_user.BeaconUser:
         # Get cached user
-        cached_user: beacon_user.BeaconUser | None = self.objects.get_object(user.id)
+        cached_user: beacon_user.BeaconUser | None = self.users.get_object(user.id)
 
         if cached_user:
             cached_user.name = user.name
@@ -169,14 +169,14 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 display_name=user.display_name,
                 avatar_url=user.avatar.url if user.avatar else None
             )
-            self.objects.store_object(new_user)
+            self.users.store_object(new_user)
             return new_user
 
     def _to_beacon_member(self, member: stoat.Member) -> beacon_member.BeaconMember:
         server = self._to_beacon_server(self.bot.get_server(member.server_id))
 
         # Get cached member
-        cached_member: beacon_member.BeaconMember | None = self.objects.get_object(member.id)
+        cached_member: beacon_member.BeaconMember | None = self.members.get_object(member.id)
 
         if cached_member:
             cached_member.name = member.name
@@ -192,7 +192,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 display_name=member.display_name,
                 avatar_url=member.avatar.url if member.avatar else None
             )
-            self.objects.store_object(new_member)
+            self.members.store_object(new_member)
             return new_member
 
     def _to_beacon_message(self, message: stoat.Message) -> beacon_message.BeaconMessage:

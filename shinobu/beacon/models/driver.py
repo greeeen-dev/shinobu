@@ -90,7 +90,10 @@ class BeaconDriver:
     def __init__(self, platform: str, bot, message_cache: beacon_messages.BeaconMessageCache,
                  pairing: beacon_pairing.BeaconPairingManager):
         self._platform: str = platform
-        self._objects: BeaconDriverObjectCache = BeaconDriverObjectCache()
+        self._servers: BeaconDriverObjectCache = BeaconDriverObjectCache()
+        self._channels: BeaconDriverObjectCache = BeaconDriverObjectCache()
+        self._users: BeaconDriverObjectCache = BeaconDriverObjectCache()
+        self._members: BeaconDriverObjectCache = BeaconDriverObjectCache()
         self._webhooks: BeaconDriverWebhookCache = BeaconDriverWebhookCache()
         self._bot = bot
         self._messages: beacon_messages.BeaconMessageCache = message_cache
@@ -232,8 +235,20 @@ class BeaconDriver:
         return self._file_count_limit
 
     @property
-    def objects(self) -> BeaconDriverObjectCache:
-        return self._objects
+    def servers(self) -> BeaconDriverObjectCache:
+        return self._servers
+
+    @property
+    def channels(self) -> BeaconDriverObjectCache:
+        return self._channels
+
+    @property
+    def users(self) -> BeaconDriverObjectCache:
+        return self._users
+
+    @property
+    def members(self) -> BeaconDriverObjectCache:
+        return self._members
 
     @property
     def webhooks(self) -> BeaconDriverWebhookCache:
