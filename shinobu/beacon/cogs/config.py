@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import discord
-import emoji
+import emoji as pyemoji
 from discord.ext import bridge, commands
 from shinobu.runtime.models import shinobu_cog, errors
 from shinobu.beacon.models import space as beacon_space, beacon_cog
@@ -324,7 +324,7 @@ class BeaconConfig(beacon_cog.BeaconCog):
                     case "modal_description":
                         space.description = user_input
                     case "modal_emoji":
-                        if (user_input and emoji.is_emoji(user_input)) or not user_input:
+                        if (user_input and pyemoji.is_emoji(user_input)) or not user_input: # pylint: disable=E1101
                             space.emoji = user_input
                         else:
                             skip_response = True
