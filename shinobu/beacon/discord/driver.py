@@ -279,7 +279,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
         server = self._to_beacon_server(member.guild)
 
         # Get cached member
-        cached_member: beacon_member.BeaconMember | None = self.members.get_object(str(member.id))
+        cached_member: beacon_member.BeaconMember | None = self.members.get_object(f"{member.id}_{member.guild.id}")
 
         if cached_member:
             cached_member.name = member.name
@@ -295,7 +295,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 display_name=member.display_name,
                 avatar_url=member.avatar.url if member.avatar else None
             )
-            self.members.store_object(new_member)
+            self.members.store_object(new_member, id_override=f"{member.id}_{member.guild.id}")
             return new_member
 
     def _to_beacon_message(self, message: discord.Message) -> beacon_message.BeaconMessage:

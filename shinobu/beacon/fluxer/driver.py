@@ -201,7 +201,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
         server = self._to_beacon_server(server)
 
         # Get cached member
-        cached_member: beacon_member.BeaconMember | None = self.members.get_object(str(member.user.id))
+        cached_member: beacon_member.BeaconMember | None = self.members.get_object(f"{member.user.id}_{server.id}")
 
         if cached_member:
             cached_member.name = member.user.username
@@ -217,7 +217,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 display_name=member.user.global_name,
                 avatar_url=member.user.avatar_url
             )
-            self.members.store_object(new_member)
+            self.members.store_object(new_member, id_override=f"{member.user.id}_{server.id}")
             return new_member
 
     def _to_beacon_message(self, message: fluxer.Message) -> beacon_message.BeaconMessage:

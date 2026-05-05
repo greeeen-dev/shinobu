@@ -176,7 +176,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
         server = self._to_beacon_server(self.bot.get_server(member.server_id))
 
         # Get cached member
-        cached_member: beacon_member.BeaconMember | None = self.members.get_object(member.id)
+        cached_member: beacon_member.BeaconMember | None = self.members.get_object(f"{member.id}_{member.server_id}")
 
         if cached_member:
             cached_member.name = member.name
@@ -192,7 +192,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 display_name=member.display_name,
                 avatar_url=member.avatar.url if member.avatar else None
             )
-            self.members.store_object(new_member)
+            self.members.store_object(new_member, id_override=f"{member.id}_{member.server_id}")
             return new_member
 
     def _to_beacon_message(self, message: stoat.Message) -> beacon_message.BeaconMessage:

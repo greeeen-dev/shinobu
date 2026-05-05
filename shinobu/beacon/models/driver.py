@@ -42,8 +42,8 @@ class BeaconDriverObjectCache:
     def __init__(self):
         self._data: dict[str, abc.BeaconABC] = {}
 
-    def store_object(self, beacon_object: abc.BeaconABC):
-        self._data.update({beacon_object.id: beacon_object})
+    def store_object(self, beacon_object: abc.BeaconABC, id_override: str | None = None):
+        self._data.update({id_override or beacon_object.id: beacon_object})
 
     def get_object(self, object_id: str) -> abc.BeaconABC | None:
         return self._data.get(object_id, None)
