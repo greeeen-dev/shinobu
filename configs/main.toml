@@ -1,5 +1,4 @@
 [system]
-admin_ids = []
 restart_on_crash = true
 
 [beacon]

@@ -144,14 +144,16 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
                 # noinspection PyProtectedMember
                 bot_needs_open: bool = (self.fluxer_bot is None) or (self.fluxer_bot._closed if self.fluxer_bot else False)
                 if bot_needs_open:
-                    owner_id: str | None = self._config.get("system").get("owner_id")
+                    owner_id: int | None = self._config.get("system").get("owner_id")
+                    if owner_id <= 0:
+                        owner_id = None
 
                     # Create new bot
                     self.fluxer_bot: FluxerBot | fluxer.Bot = FluxerBot(
                         self._beacon,
                         self._driver,
                         command_prefix=self.bot.command_prefix,
-                        owner_id=int(owner_id) if owner_id else None
+                        owner_id=owner_id
                     )
 
                     self._driver.replace_bot(self.fluxer_bot)
