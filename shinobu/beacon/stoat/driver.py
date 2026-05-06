@@ -159,7 +159,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
         if cached_user:
             cached_user.name = user.name
             cached_user.display_name = user.display_name
-            cached_user.avatar_url = user.avatar.url if user.avatar else None
+            cached_user.avatar_url = user.avatar.url() if user.avatar else None
             return cached_user
         else:
             new_user: beacon_user.BeaconUser = beacon_user.BeaconUser(
@@ -190,7 +190,7 @@ class StoatDriver(beacon_driver.BeaconDriver):
                 name=member.name,
                 server=server,
                 display_name=member.display_name,
-                avatar_url=member.avatar.url if member.avatar else None
+                avatar_url=member.avatar.url() if member.avatar else None
             )
             self.members.store_object(new_member, id_override=f"{member.id}_{member.server_id}")
             return new_member
