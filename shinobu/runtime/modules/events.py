@@ -19,11 +19,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 import uuid
 import traceback
 import discord
+import time
 from discord.ext import commands, bridge
 from shinobu.runtime.models import errors
 from shinobu.runtime.models.colors import Colors
 from shinobu.runtime.utils import check_slash
-
 from shinobu.runtime.models import shinobu_cog
 
 class ShinobuEvents(shinobu_cog.ShinobuCog):
@@ -40,6 +40,8 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
             commands.CheckFailure,
             commands.MissingRequiredArgument
         ]
+        self.handled_errors: dict[int, dict[str, int]] = {}
+        self.error_banned: list[int] = []
 
     def check_error_expected(self, error):
         for expected in self.expected_errors:
@@ -58,11 +60,23 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         error_title: str = "oh nooooo >.<"
         error_description: str = "An error occurred and the command failed to run. Sorry about that... :<"
 
+        if ctx.author.id in self.error_banned:
+            return
+
+        if ctx.author.id not in self.handled_errors:
+            self.handled_errors.update({ctx.author.id: {"expiry": round(time.time()) + 60, "count": 0}})
+
+        if self.handled_errors[ctx.author.id]["expiry"] < time.time():
+            self.handled_errors.update({ctx.author.id: {"expiry": round(time.time()) + 60, "count": 0}})
+
+        self.handled_errors[ctx.author.id]["count"] += 1
+
         if (
                 isinstance(error, discord.errors.ApplicationCommandInvokeError) or
                 isinstance(error, discord.ext.commands.CommandInvokeError)
         ):
             error = error.original
+            traceback_str = "".join(traceback.format_exception(error))
 
         # Handle expected errors
         if isinstance(error, commands.MissingRequiredArgument):
@@ -86,6 +100,12 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
             # Unexpected error
             record_error = True
 
+        if self.handled_errors[ctx.author.id]["count"] == 5:
+            self.error_banned.append(ctx.author.id)
+            record_error = False
+            error_title = "ok this is getting ridiculous"
+            error_description = "You've caused lots of errors already! We'll silence these for now."
+
         embed: discord.Embed = discord.Embed(
             title=error_title,
             description=error_description,
@@ -95,6 +115,7 @@ class ShinobuEvents(shinobu_cog.ShinobuCog):
         if record_error:
             # Record error
             error_data: dict[str, int] = {
+                "platform": "discord",
                 "server": ctx.guild.id if ctx.guild else None,
                 "channel": ctx.channel.id,
                 "user": ctx.author.id
