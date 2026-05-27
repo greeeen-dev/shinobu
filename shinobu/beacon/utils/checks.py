@@ -40,10 +40,17 @@ class CommandChecks:
     def can_check_details():
         async def predicate(ctx):
             beacon: beacon_protocol.Beacon = get_beacon(ctx.bot)
+            has_perms: bool = False
+
+            if type(get_user(ctx)) is discord.Member:
+                has_perms = (
+                    get_user(ctx).guild_permissions.ban_members or
+                    get_user(ctx).guild_permissions.manage_messages
+                )
+
             return (
                 beacon.moderators.is_moderator(str(get_user(ctx).id)) or
-                get_user(ctx).guild_permissions.manage_messages or
-                get_user(ctx).guild_permissions.ban_members or
+                has_perms or
                 get_user(ctx).id == ctx.bot.owner_id or
                 get_user(ctx).id in ctx.bot.owner_ids
             )
@@ -56,9 +63,14 @@ class CommandChecks:
         # noinspection DuplicatedCode
         async def predicate(ctx):
             beacon: beacon_protocol.Beacon = get_beacon(ctx.bot)
+            has_perms: bool = False
+
+            if type(get_user(ctx)) is discord.Member:
+                has_perms = get_user(ctx).guild_permissions.ban_members
+
             return (
                 beacon.moderators.is_moderator(str(get_user(ctx).id)) or
-                get_user(ctx).guild_permissions.ban_members or
+                has_perms or
                 get_user(ctx).id == ctx.bot.owner_id or
                 get_user(ctx).id in ctx.bot.owner_ids
             )
@@ -71,9 +83,14 @@ class CommandChecks:
         # noinspection DuplicatedCode
         async def predicate(ctx):
             beacon: beacon_protocol.Beacon = get_beacon(ctx.bot)
+            has_perms: bool = False
+
+            if type(get_user(ctx)) is discord.Member:
+                has_perms = get_user(ctx).guild_permissions.manage_channels
+
             return (
                 beacon.moderators.is_moderator(str(get_user(ctx).id)) or
-                get_user(ctx).guild_permissions.manage_channels or
+                has_perms or
                 get_user(ctx).id == ctx.bot.owner_id or
                 get_user(ctx).id in ctx.bot.owner_ids
             )

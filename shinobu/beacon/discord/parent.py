@@ -32,9 +32,10 @@ class DiscordDriverParent(shinobu_cog.ShinobuCog):
         super().__init__(
             bot,
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
-                name="Beacon Discord driver",
+                name="Beacon Driver (Discord)",
                 description="Manages the Beacon driver for Discord.",
-                visible_in_help=True
+                emoji="\U0001F9E9",
+                visible_in_help=False
             )
         )
 

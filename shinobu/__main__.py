@@ -28,6 +28,7 @@ import getpass
 import uuid
 import asyncio
 import discord
+import fluxer
 from discord.ext import commands
 from dotenv import load_dotenv
 from shinobu.runtime import runtime
@@ -51,12 +52,14 @@ parser = argparse.ArgumentParser(
 parser.add_argument("--secrets", help="Launches the Secrets Manager CLI.", action="store_true")
 parser.add_argument("--installer", help="Launches the installer CLI.", action="store_true")
 parser.add_argument("--devmode", help="Launches Shinobu with developer mode.", action="store_true")
+parser.add_argument("--fluxer", help="Launches Shinobu with Fluxer runtime.", action="store_true")
 launch_args = parser.parse_args()
 
 # Get launch options
 launch_secrets_cli: bool = launch_args.secrets
 launch_installer_cli: bool = launch_args.installer
 devmode: bool = launch_args.devmode
+use_fluxer: bool = launch_args.fluxer
 
 # Store restart options
 restart_message_id: int | None = None
@@ -373,7 +376,7 @@ class SecretsIssuingAuthority:
         if filename not in wrapper_entitlements:
             raise ValueError("Wrapper does not have entitlements to this file")
 
-    def read(self, wrapper: fine_grained.FineGrainedSecureFiles, filename: str) -> str:
+    def read(self, wrapper: fine_grained.FineGrainedSecureFiles, filename: str) -> str | bytes:
         """Reads a file for a FineGrainedSecureFiles object."""
 
         # Ensure wrapper has entitlements
@@ -395,7 +398,7 @@ class SecretsIssuingAuthority:
         # Decrypt file
         return raw_encryptor.decrypt(encrypted_data)
 
-    def save(self, wrapper: fine_grained.FineGrainedSecureFiles, filename: str, data: str):
+    def save(self, wrapper: fine_grained.FineGrainedSecureFiles, filename: str, data: str | bytes):
         # Ensure wrapper has entitlements
         self._check_file_entitlement(wrapper, filename)
 
@@ -407,7 +410,7 @@ class SecretsIssuingAuthority:
             # noinspection PyTypeChecker
             json.dump(encrypted_data.to_dict(), file)
 
-    def export(self, wrapper: fine_grained.FineGrainedSecureFiles, filename: str, data: str,
+    def export(self, wrapper: fine_grained.FineGrainedSecureFiles, filename: str, data: str | bytes,
                use_strong_kdf: bool = True) -> EncryptedData:
         # Ensure wrapper has entitlements
         self._check_file_entitlement(wrapper, filename)
@@ -437,7 +440,7 @@ class ActualFineGrainedSecureFiles(fine_grained.FineGrainedSecureFiles):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def read(self, filename: str) -> str:
+    def read(self, filename: str) -> str | bytes:
         return secrets_authority.read(self, filename)
 
     def read_json(self, filename: str) -> dict:
@@ -451,12 +454,13 @@ class ActualFineGrainedSecureFiles(fine_grained.FineGrainedSecureFiles):
         secrets_authority.save(self, filename, data)
 
     def save_json(self, filename: str, data: dict):
-        secrets_authority.save(self, filename, orjson.dumps(data).decode())
+        secrets_authority.save(self, filename, orjson.dumps(data))
 
     def export(self, filename: str, data: str, use_strong_kdf: bool = True) -> EncryptedData | None:
         return secrets_authority.export(self, filename, data, use_strong_kdf=use_strong_kdf)
 
     def export_json(self, filename: str, data: dict, use_strong_kdf: bool = True) -> EncryptedData | None:
+        # We'll use string so exporting is easy
         return secrets_authority.export(
             self, filename, orjson.dumps(data).decode(), use_strong_kdf=use_strong_kdf
         )
@@ -475,9 +479,10 @@ class ExtensionCogMap:
         # Ensure cog is a subclass of shinobu_cog.ShinobuCog
         if (
                 type(cog) is commands.Cog or type(cog) is shinobu_cog.ShinobuCog or
-                not isinstance(cog, shinobu_cog.ShinobuCog)
+                type(cog) is fluxer.Cog or not isinstance(cog, shinobu_cog.ShinobuCog) or
+                not isinstance(cog, shinobu_cog.ShinobuFluxerCog)
         ):
-            raise TypeError("Cog must be a subclass of shinobu_cog.ShinobuCog")
+            raise TypeError("Cog must be a subclass of shinobu_cog.ShinobuCog or shinobu_cog.ShinobuFluxerCog")
 
         # Get expected cog type
         try:
@@ -506,8 +511,8 @@ extension_map: ExtensionCogMap | None = None
 class ModuleLoader:
     """Loads a plugin with all of its entitlements."""
 
-    def __init__(self, bot: commands.Bot):
-        self.bot: commands.Bot = bot
+    def __init__(self, bot: commands.Bot | fluxer.Bot):
+        self.bot: commands.Bot | fluxer.Bot = bot
 
     @staticmethod
     def _get_entitlements(package: str) -> dict:
@@ -537,7 +542,9 @@ class ModuleLoader:
             return
 
         # Try to get matching cog from cache
-        matching_cog: shinobu_cog.ShinobuCog | commands.Cog | None = extension_map.get(package)
+        matching_cog: (
+                shinobu_cog.ShinobuCog | shinobu_cog.ShinobuFluxerCog | commands.Cog | fluxer.Cog | None
+        ) = extension_map.get(package)
 
         if not matching_cog:
             # Fetch matching cog
@@ -555,7 +562,10 @@ class ModuleLoader:
 
         if matching_cog:
             # Issue entitlements
-            if isinstance(matching_cog, shinobu_cog.ShinobuCog):
+            if (
+                    isinstance(matching_cog, shinobu_cog.ShinobuCog) or
+                    isinstance(matching_cog, shinobu_cog.ShinobuFluxerCog)
+            ):
                 matching_cog.issue_entitlements(
                     secrets=entitlements.get("secrets_wrapper"),
                     files=entitlements.get("files_wrapper")
@@ -601,9 +611,14 @@ def start_bot() -> bool:
     intents.presences = False
 
     # Create Shinobu bot instance
-    bot: runtime.ShinobuBot = runtime.ShinobuBot(
-        command_prefix="sh!", intents=intents, manifest=manifest_path, version=version, devmode=devmode
-    )
+    if use_fluxer:
+        bot: runtime.ShinobuFluxerBot = runtime.ShinobuFluxerBot(
+            command_prefix="sh!", intents=intents, manifest=manifest_path, version=version, devmode=devmode
+        )
+    else:
+        bot: runtime.ShinobuBot = runtime.ShinobuBot(
+            command_prefix="sh!", intents=intents, manifest=manifest_path, version=version, devmode=devmode
+        )
     bot.restart_message_id = restart_message_id
     bot.restart_message_channel_id = restart_message_channel_id
     bot.setup_entitlements_loader(ModuleLoader(bot))

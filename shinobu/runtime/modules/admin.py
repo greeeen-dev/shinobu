@@ -39,11 +39,13 @@ class Admin(shinobu_cog.ShinobuCog):
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
                 name="Admin",
                 description="Admin commands",
-                visible_in_help=True
+                emoji="\U0001F9F0",
+                visible_in_help=True,
+                owner_only=True
             )
         )
 
-    @commands.command(name="eval")
+    @commands.command(name="eval", description="Evaluates code.")
     @commands.is_owner()
     async def eval(self, ctx: commands.Context, *, body: str):
         """Evaluates code."""
@@ -120,7 +122,60 @@ class Admin(shinobu_cog.ShinobuCog):
             else:
                 await ctx.send(f':white_check_mark: Evaluation completed in `{exec_time}` seconds.\n```\n{value}\n```')
 
-    @commands.command(name="shutdown", aliases=["poweroff"])
+    @commands.command(name="view-error", description="Shows info about an error.")
+    @commands.is_owner()
+    async def view_error(self, ctx: commands.Context, error_id: str):
+        """Shows info about an error."""
+
+        error_data: dict | None = self.bot.errors.get(error_id)
+
+        if not error_data:
+            return await ctx.reply("could not find this error :/")
+
+        error_metadata: dict = error_data.get("data")
+        error_traceback: str = error_data.get("traceback")
+
+        embed = discord.Embed(
+            title=f":beetle: error info for {error_id}",
+            description=f"```\n{error_traceback}\n```" if error_traceback else "*No traceback recorded. Strange.*",
+            color=self.bot.colors.warning
+        )
+        embed.add_field(
+            name="Platform",
+            value=error_metadata.get("platform") or "*No platform info recorded*",
+            inline=False
+        )
+        embed.add_field(
+            name="Server ID",
+            value=error_metadata.get("server") or "*No server ID recorded*",
+            inline=False
+        )
+        embed.add_field(
+            name="Channel ID",
+            value=error_metadata.get("channel") or "*No channel ID recorded*",
+            inline=False
+        )
+        embed.add_field(
+            name="User ID",
+            value=error_metadata.get("user") or "*No user ID recorded*",
+            inline=False
+        )
+        embed.set_footer(
+            text="This may contain sensitive data. Do not share this with others unless you know what you're doing."
+        )
+
+        await ctx.author.send(embed=embed)
+
+        if ctx.guild:
+            await ctx.reply("check your dms :eyes:")
+
+    @commands.command(name="throw-error", description="Throws an error. But cutely. That's about it.")
+    @commands.is_owner()
+    async def throw_error(self, ctx: commands.Context):
+        """Throws an error. But cutely. That's about it."""
+        raise RuntimeError("haiiiii!!! >w<")
+
+    @commands.command(name="shutdown", aliases=["poweroff"], description="Shuts the bot down.")
     @commands.is_owner()
     async def shutdown(self, ctx: commands.Context):
         """Shuts the bot down."""
@@ -129,7 +184,7 @@ class Admin(shinobu_cog.ShinobuCog):
         # Shut down bot
         await self.bot.close()
 
-    @commands.command(name="restart", aliases=["reboot"])
+    @commands.command(name="restart", aliases=["reboot"], description="Restarts the bot.")
     @commands.is_owner()
     async def restart(self, ctx: commands.Context):
         """Restarts the bot."""

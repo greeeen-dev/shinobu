@@ -489,9 +489,11 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
         super().__init__(
             bot,
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
-                name="Beacon Stoat driver",
+                name="Beacon Driver (Stoat)",
                 description="Manages the Beacon driver for Stoat.",
-                visible_in_help=True
+                emoji="\U0001F9E9",
+                visible_in_help=True,
+                owner_only=True
             )
         )
 
@@ -624,7 +626,7 @@ class StoatDriverParent(shinobu_cog.ShinobuCog):
 
     @stoat_text.command()
     @commands.is_owner()
-    async def stoat(self, ctx: commands.Context):
+    async def restart(self, ctx: commands.Context):
         await self.restart_bot()
         await ctx.send("Stoat bot restarted.")
 

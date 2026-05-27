@@ -32,7 +32,7 @@ class BeaconConfig(beacon_cog.BeaconCog):
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
                 name="Config",
                 description="A module containing configuration commands.",
-                emoji="\U0001F4E1",
+                emoji="\U0001F3A8",
                 visible_in_help=True
             )
         )

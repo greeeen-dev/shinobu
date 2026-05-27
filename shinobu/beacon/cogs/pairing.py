@@ -32,7 +32,7 @@ class BeaconPairing(beacon_cog.BeaconCog):
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
                 name="Pairing",
                 description="A module containing server pairing commands.",
-                emoji="\U0001F4E1",
+                emoji="\U0001F517",
                 visible_in_help=True
             )
         )
@@ -47,7 +47,7 @@ class BeaconPairing(beacon_cog.BeaconCog):
     @CommandChecks.can_manage()
     async def pair_server(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
                           code: str | None = None):
-        """Pairs the server with other servers to enable more bridge features."""
+        """Pairs the server with other servers to enable more bridge features. This does NOT set up a bridge."""
 
         discord_driver: beacon_driver.BeaconDriver = self._beacon.drivers.get_driver("discord")
         server: beacon_server.BeaconServer = discord_driver.get_server(str(ctx.guild.id))

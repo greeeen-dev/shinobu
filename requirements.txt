@@ -1,4 +1,5 @@
 py-cord[speed]
+git+https://github.com/greeeen-dev/spacebar.py.git
 python-dotenv
 pycryptodome
 ujson
@@ -14,3 +15,4 @@ argon2-cffi
 psutil
 git+https://github.com/greeeen-dev/capacitor.git
 emoji
+zstandard

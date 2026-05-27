@@ -22,6 +22,7 @@ import random
 import string
 import argon2
 import psutil
+import zstandard
 from Crypto.Protocol.KDF import PBKDF2
 from Crypto.Cipher import AES, ChaCha20_Poly1305
 from Crypto import Hash
@@ -65,11 +66,24 @@ if available_mib >= 4096:
     # We need 2 GiB for argon2_high, so requiring 4 GiB is a safe minimum
     argon2_available.append("argon2_high")
 
+# Available compression algorithms
+compression_available: list[str] = [
+    "zstd"
+]
+
+# Zstd profiles
+zstd_available: list[str] = [
+    "zstd_fast",
+    "zstd_balanced",
+    "zstd_best"
+]
+
 class EncryptedData:
     """A class representing data encrypted using any available algorithm."""
 
     def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, algorithm: str, kdf: str | None = None,
-                 profile: str | None = None):
+                 profile: str | None = None, compression: str | None = None, compression_profile: str | None = None,
+                 raw: bool = False):
         self._ciphertext: str = ciphertext
         self._tag: str = tag
         self._nonce: str = nonce
@@ -77,6 +91,9 @@ class EncryptedData:
         self._algorithm: str = algorithm
         self._kdf: str = kdf or "pbkdf2"
         self._profile: str = profile or "pbkdf2_hmac_sha_1"
+        self._compression: str | None = compression
+        self._compression_profile: str | None = compression_profile
+        self._raw: bool = raw
         self._outdated: bool = False
 
         if not profile and self._kdf == "pbkdf2":
@@ -131,6 +148,24 @@ class EncryptedData:
         return self._profile
 
     @property
+    def compression(self) -> str:
+        """Compression algorithm used."""
+
+        return self._compression
+
+    @property
+    def compression_profile(self) -> str:
+        """Compression profile used."""
+
+        return self._compression_profile
+
+    @property
+    def raw(self) -> bool:
+        """Whether the original data was in bytes."""
+
+        return self._raw
+
+    @property
     def outdated(self) -> bool:
         """Indicates whether the secrets needs re-encrypting."""
 
@@ -146,7 +181,10 @@ class EncryptedData:
             "salt": self.salt,
             "algorithm": self.algorithm,
             "kdf": self.kdf,
-            "profile": self.profile
+            "profile": self.profile,
+            "compression": self.compression,
+            "compression_profile": self.compression_profile,
+            "raw": self.raw
         }
 
     @classmethod
@@ -164,15 +202,20 @@ class EncryptedData:
             salt=data["salt"],
             algorithm=data.get("algorithm", "aes-256-gcm"),
             kdf=data.get("kdf", "pbkdf2"),
-            profile=data.get("profile")
+            profile=data.get("profile"),
+            compression=data.get("compression"),
+            compression_profile=data.get("compression_profile"),
+            raw=data.get("raw", False)
         )
 
 class GCMEncryptedData(EncryptedData):
     """A class representing data encrypted using AES-256-GCM."""
 
     def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, kdf: str | None = None,
-                 profile: str | None = None):
-        super().__init__(ciphertext, tag, nonce, salt, "aes-256-gcm", kdf=kdf, profile=profile)
+                 profile: str | None = None, compression: str | None = None, compression_profile: str | None = None,
+                 raw: bool = False):
+        super().__init__(ciphertext, tag, nonce, salt, "aes-256-gcm", kdf=kdf, profile=profile,
+                         compression=compression, compression_profile=compression_profile, raw=raw)
 
     @classmethod
     def from_dict(cls, data: dict) -> 'GCMEncryptedData':
@@ -189,7 +232,10 @@ class GCMEncryptedData(EncryptedData):
             nonce=data["nonce"],
             salt=data["salt"],
             kdf=data.get("kdf", "pbkdf2"),
-            profile=data.get("profile")
+            profile=data.get("profile"),
+            compression=data.get("compression"),
+            compression_profile=data.get("compression_profile"),
+            raw=data.get("raw", False)
         )
 
 
@@ -197,8 +243,10 @@ class XChaCha20EncryptedData(EncryptedData):
     """A class representing data encrypted using XChaCha20-Poly1305."""
 
     def __init__(self, ciphertext: str, tag: str, nonce: str, salt: str, kdf: str | None = None,
-                 profile: str | None = None):
-        super().__init__(ciphertext, tag, nonce, salt, "xchacha20-poly1305", kdf=kdf, profile=profile)
+                 profile: str | None = None, compression: str | None = None, compression_profile: str | None = None,
+                 raw: bool = False):
+        super().__init__(ciphertext, tag, nonce, salt, "xchacha20-poly1305", kdf=kdf, profile=profile,
+                         compression=compression, compression_profile=compression_profile, raw=raw)
 
     @classmethod
     def from_dict(cls, data: dict) -> 'XChaCha20EncryptedData':
@@ -214,8 +262,33 @@ class XChaCha20EncryptedData(EncryptedData):
             nonce=data["nonce"],
             salt=data["salt"],
             kdf=data.get("kdf", "pbkdf2"),
-            profile=data.get("profile")
+            profile=data.get("profile"),
+            compression=data.get("compression"),
+            compression_profile=data.get("compression_profile"),
+            raw=data.get("raw", False)
         )
+
+class ZstdCompressor:
+    # Level mapping
+    level_mapping: dict[str, int] = {
+        "zstd_fast": -1,
+        "zstd_balanced": 3,
+        "zstd_best": 22,
+    }
+
+    @staticmethod
+    def compress(data: bytes, profile: str) -> bytes:
+        level: int = ZstdCompressor.level_mapping.get(profile, 3)
+
+        # Compress data
+        compressor: zstandard.ZstdCompressor = zstandard.ZstdCompressor(level=level)
+        return compressor.compress(data)
+
+    @staticmethod
+    def decompress(data: bytes) -> bytes:
+        # Decompress data
+        decompressor: zstandard.ZstdDecompressor = zstandard.ZstdDecompressor()
+        return decompressor.decompress(data)
 
 class BaseEncryptor:
     @staticmethod
@@ -227,6 +300,26 @@ class BaseEncryptor:
         salt: bytes = base64.b64decode(data.salt)
         ciphertext: bytes = base64.b64decode(data.ciphertext)
         return nonce, tag, salt, ciphertext
+
+    @staticmethod
+    def compress_bytes(data: bytes, compressor: str, compressor_profile: str) -> bytes:
+        if compressor not in compression_available:
+            raise ValueError("Invalid compressor. If we let you do this, you'd probably lose your data.")
+
+        if compressor == "zstd":
+            return ZstdCompressor.compress(data, compressor_profile)
+
+        return data
+
+    @staticmethod
+    def decompress_bytes(data: bytes, compressor: str) -> bytes:
+        if compressor not in compression_available:
+            raise ValueError("Invalid compressor, you probably just lost your data. Congratulations.")
+
+        if compressor == "zstd":
+            return ZstdCompressor.decompress(data)
+
+        return data
 
     @staticmethod
     def derive_password_hash(password: str, salt: bytes, kdf: str = "argon2", profile: str | None = None) -> bytearray:
@@ -278,8 +371,8 @@ class BaseEncryptor:
 
 class GCMEncryptor(BaseEncryptor):
     @staticmethod
-    def encrypt(plaintext_data: str, password: str, kdf: str = "argon2", profile: str | None = None
-                ) -> GCMEncryptedData:
+    def encrypt(plaintext_data: str | bytes, password: str, kdf: str = "argon2", profile: str | None = None,
+                compression: str | None = None, compression_profile: str | None = None) -> GCMEncryptedData:
         """Encrypts a given string using AES-256-GCM and returns encrypted data."""
 
         if kdf and kdf not in kdf_available:
@@ -297,6 +390,10 @@ class GCMEncryptor(BaseEncryptor):
         salt: bytes = CryptoRandom.get_random_bytes(16)
         nonce: bytes = CryptoRandom.get_random_bytes(12)
         encoded: bytes = plaintext_data.encode()
+
+        # Compress data
+        if compression and compression_profile:
+            encoded = GCMEncryptor.compress_bytes(encoded, compression, compression_profile)
 
         # Create password hash from selected KDF
         key: bytearray = GCMEncryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
@@ -318,11 +415,13 @@ class GCMEncryptor(BaseEncryptor):
             nonce=base64.b64encode(nonce).decode('ascii'),
             salt=base64.b64encode(salt).decode('ascii'),
             kdf=kdf,
-            profile=profile
+            profile=profile,
+            compression=compression,
+            compression_profile=compression_profile
         )
 
     @staticmethod
-    def decrypt(data: GCMEncryptedData | EncryptedData, password: str):
+    def decrypt(data: GCMEncryptedData | EncryptedData, password: str) -> str | bytes:
         """Decrypts data encrypted using AES-256-GCM."""
 
         # Decode base64 strings to bytes
@@ -346,12 +445,19 @@ class GCMEncryptor(BaseEncryptor):
         for index in range(len(key)):
             key[index] = 0
 
-        return result.decode()
+        # Decompress data
+        if data.compression and data.compression_profile:
+            result = GCMEncryptor.decompress_bytes(result, data.compression)
+
+        if data.raw:
+            return result
+        else:
+            return result.decode()
 
 class XChaCha20Encryptor(BaseEncryptor):
     @staticmethod
-    def encrypt(plaintext_data: str, password: str, kdf: str = "argon2", profile: str | None = None
-                ) -> XChaCha20EncryptedData:
+    def encrypt(plaintext_data: str | bytes, password: str, kdf: str = "argon2", profile: str | None = None,
+                compression: str | None = None, compression_profile: str | None = None) -> XChaCha20EncryptedData:
         """Encrypts a given string using XChaCha20-Poly1305 and returns encrypted data."""
 
         if kdf and kdf not in kdf_available:
@@ -368,7 +474,18 @@ class XChaCha20Encryptor(BaseEncryptor):
         # Generate random salt and nonce
         salt: bytes = CryptoRandom.get_random_bytes(16)
         nonce: bytes = CryptoRandom.get_random_bytes(24)
-        encoded: bytes = plaintext_data.encode()
+
+        # Get bytes
+        raw: bool = False
+        if type(plaintext_data) is bytes:
+            raw = True
+            encoded = plaintext_data
+        else:
+            encoded: bytes = plaintext_data.encode()
+
+        # Compress data
+        if compression and compression_profile:
+            encoded = XChaCha20Encryptor.compress_bytes(encoded, compression, compression_profile)
 
         # Create password hash from selected KDF
         key: bytearray = XChaCha20Encryptor.derive_password_hash(password, salt, kdf=kdf, profile=profile)
@@ -390,11 +507,14 @@ class XChaCha20Encryptor(BaseEncryptor):
             nonce=base64.b64encode(nonce).decode('ascii'),
             salt=base64.b64encode(salt).decode('ascii'),
             kdf=kdf,
-            profile=profile
+            profile=profile,
+            compression=compression,
+            compression_profile=compression_profile,
+            raw=raw
         )
 
     @staticmethod
-    def decrypt(data: XChaCha20EncryptedData | EncryptedData, password: str):
+    def decrypt(data: XChaCha20EncryptedData | EncryptedData, password: str) -> str | bytes:
         """Decrypts data encrypted using XChaCha20-Poly1305."""
 
         if data.algorithm != "xchacha20-poly1305":
@@ -418,14 +538,22 @@ class XChaCha20Encryptor(BaseEncryptor):
         for index in range(len(key)):
             key[index] = 0
 
-        return result.decode()
+        # Decompress data
+        if data.compression and data.compression_profile:
+            result = XChaCha20Encryptor.decompress_bytes(result, data.compression)
+
+        if data.raw:
+            return result
+        else:
+            return result.decode()
 
 class AutoEncryptor:
     """An encryptor that encrypts and decrypts data using multiple algorithms."""
 
     @staticmethod
-    def encrypt(plaintext_data: str, password: str, algorithm: str = "xchacha20-poly1305", kdf: str = "argon2",
-                profile: str | None = None) -> EncryptedData:
+    def encrypt(plaintext_data: str | bytes, password: str, algorithm: str = "xchacha20-poly1305", kdf: str = "argon2",
+                profile: str | None = None, compression: str | None = None, compression_profile: str | None = None
+                ) -> EncryptedData:
         """Encrypts a given string using the algorithm of choice and returns encrypted data.
 
         XChaCha20-Poly1305 (xchacha20-poly1305) algorithm with Argon2 KDF (argon2) using
@@ -435,13 +563,19 @@ class AutoEncryptor:
             raise ValueError(f"Invalid algorithm {algorithm}")
 
         if algorithm == "xchacha20-poly1305":
-            return XChaCha20Encryptor.encrypt(plaintext_data, password, kdf=kdf, profile=profile)
+            return XChaCha20Encryptor.encrypt(
+                plaintext_data, password, kdf=kdf, profile=profile, compression=compression,
+                compression_profile=compression_profile
+            )
         else:
             # Fallback to AES-256-GCM (although this should've been handled)
-            return GCMEncryptor.encrypt(plaintext_data, password, kdf=kdf, profile=profile)
+            return GCMEncryptor.encrypt(
+                plaintext_data, password, kdf=kdf, profile=profile, compression=compression,
+                compression_profile=compression_profile
+            )
 
     @staticmethod
-    def decrypt(data: EncryptedData, password: str) -> str:
+    def decrypt(data: EncryptedData, password: str) -> str | bytes:
         """Decrypts encrypted data."""
 
         if data.algorithm not in algo_available:
@@ -486,7 +620,8 @@ if __name__ == "__main__":
     # Test encryption
     stime = time.time()
     encrypted_data: EncryptedData = encryptor.encrypt(
-        plaintext, "password", algorithm=algo, kdf=kdf_used, profile=kdf_profile
+        plaintext, "password", algorithm=algo, kdf=kdf_used, profile=kdf_profile, compression="zstd",
+        compression_profile="zstd_balanced"
     )
     etime = time.time() - stime
 
@@ -498,12 +633,15 @@ if __name__ == "__main__":
     # Print encrypted data
     print("Encrypted data info:")
     print(f"- ciphertext: {encrypted_data.ciphertext if len(plaintext) <= 1000 else '[omitted]'}")
+    print(f"- ciphertext length: {len(encrypted_data.ciphertext)}")
     print(f"- tag: {encrypted_data.tag}")
     print(f"- nonce: {encrypted_data.nonce}")
     print(f"- salt: {encrypted_data.salt}")
     print(f"- algorithm: {encrypted_data.algorithm}")
     print(f"- kdf: {encrypted_data.kdf}")
     print(f"- kdf profile: {encrypted_data.profile}")
+    print(f"- compressor: {encrypted_data.compression}")
+    print(f"- compressor profile: {encrypted_data.compression_profile}")
     print(f"- duration: {round(etime * 1000, 2)}ms")
     print("")
 

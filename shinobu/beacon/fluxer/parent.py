@@ -70,9 +70,11 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
         super().__init__(
             bot,
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
-                name="Beacon Fluxer driver",
+                name="Beacon Driver (Fluxer)",
                 description="Manages the Beacon driver for Fluxer.",
-                visible_in_help=True
+                emoji="\U0001F9E9",
+                visible_in_help=True,
+                owner_only=True
             )
         )
 
@@ -230,6 +232,8 @@ class FluxerDriverParent(shinobu_cog.ShinobuCog):
     @fluxer_text.command()
     @commands.is_owner()
     async def restart(self, ctx: commands.Context):
+        """Restarts the Fluxer client."""
+
         await self.restart_bot()
         await ctx.send("Fluxer bot restarted.")
 

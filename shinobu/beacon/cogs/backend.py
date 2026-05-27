@@ -28,7 +28,7 @@ class BeaconBackend(shinobu_cog.ShinobuCog):
             shinobu_metadata=shinobu_cog.ShinobuCogMetadata(
                 name="Beacon Backend",
                 description="Manages the Shinobu Beacon bridge protocol.",
-                visible_in_help=True
+                visible_in_help=False
             )
         )
         self._beacon: beacon.Beacon | None = None

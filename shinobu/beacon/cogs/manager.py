@@ -37,7 +37,7 @@ class BeaconManager(beacon_cog.BeaconCog):
     async def beacon_text(self, ctx):
         pass
 
-    @beacon_text.command(name="bacon")
+    @beacon_text.command(name="bacon", description="Bacon 🥓")
     async def bacon(self, ctx: commands.Context):
         """Bacon 🥓"""
         await ctx.send("Bacon :bacon:")

@@ -18,17 +18,20 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 import asyncio
 import discord
+import fluxer
 from discord.ext import commands, bridge
 from shinobu.runtime.secrets import fine_grained
 
 class ShinobuCogMetadata:
     """A class representing metadata for a LabeledCog."""
 
-    def __init__(self, name: str, description: str, emoji: str | None = None, visible_in_help: bool = True):
+    def __init__(self, name: str, description: str, emoji: str | None = None, visible_in_help: bool = True,
+                 owner_only: bool = False):
         self._name: str = name
         self._description: str = description
         self._emoji: str | None = emoji
         self._visible_in_help: bool = visible_in_help
+        self._owner_only: bool = owner_only
 
     @property
     def name(self) -> str:
@@ -43,8 +46,19 @@ class ShinobuCogMetadata:
         return self._emoji
 
     @property
+    def decorated_name(self) -> str:
+        if self.emoji:
+            return f"{self.emoji} {self.name}"
+
+        return self.name
+
+    @property
     def visible_in_help(self) -> bool:
         return self._visible_in_help
+
+    @property
+    def owner_only(self) -> bool:
+        return self._owner_only
 
 class ShinobuCog(commands.Cog):
     def __init__(self, bot, shinobu_metadata: ShinobuCogMetadata | None = None):
@@ -94,3 +108,37 @@ class ShinobuCog(commands.Cog):
             return False, None
 
         return interaction.custom_id == "danger_confirm", interaction
+
+class ShinobuFluxerCog(fluxer.Cog):
+    def __init__(self, bot, shinobu_metadata: ShinobuCogMetadata | None = None):
+        super().__init__(bot)
+        self._shinobu_metadata: ShinobuCogMetadata | None = shinobu_metadata
+        self._shinobu_secrets: fine_grained.FineGrainedSecrets | None = None
+        self._shinobu_files: fine_grained.FineGrainedSecureFiles | None = None
+
+    def issue_entitlements(self, secrets: fine_grained.FineGrainedSecrets | None = None,
+                           files: fine_grained.FineGrainedSecureFiles | None = None):
+        """Issues entitlements to a Shinobu cog."""
+
+        if self._shinobu_secrets is None:
+            self._shinobu_secrets = secrets
+        if self._shinobu_files is None:
+            self._shinobu_files = files
+
+        self.on_entitlements_issued()
+
+    def on_entitlements_issued(self):
+        """Method called when entitlements are issued. Overwrite this as needed."""
+        return
+
+    @property
+    def shinobu_metadata(self) -> ShinobuCogMetadata:
+        return self._shinobu_metadata
+
+    @property
+    def secrets(self) -> fine_grained.FineGrainedSecrets:
+        return self._shinobu_secrets
+
+    @property
+    def files(self) -> fine_grained.FineGrainedSecureFiles:
+        return self._shinobu_files

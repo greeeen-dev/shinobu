@@ -114,13 +114,16 @@ class BeaconFrontend(beacon_cog.BeaconCog):
             elif len(ctx.value) == 0:
                 matches.append(f"{space.name} ({space.id})")
 
-        if len(ctx.value) > 0:
-            matches.append(ctx.value)
+        all_matches: list[str] = (priority_matches + matches)[:25]
 
-        all_matches: list[str] = priority_matches + matches
+        if len(ctx.value) > 0:
+            if len(all_matches) == 25:
+                all_matches.pop(-1)
+
+            all_matches.append(f"\U0001F50D {ctx.value}")
 
         return [
-            discord.OptionChoice(name=all_matches[i]) for i in range(len(all_matches) if len(all_matches) <= 25 else 25)
+            discord.OptionChoice(name=match) for match in all_matches
         ]
 
     @bridge_universal.command(name="spaces")
@@ -289,10 +292,11 @@ class BeaconFrontend(beacon_cog.BeaconCog):
 
     @bridge_universal.command(name="delete-space")
     @bridge.bridge_option("space_id", description="The ID of the Space to delete.")
+    @commands.guild_only()
     @CommandChecks.can_manage()
     async def delete_space(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
                            space_id: str):
-        """Shows options for a Space."""
+        """Deletes a Space. Use with caution."""
 
         # Get space
         space: beacon_space.BeaconSpace | None = self._beacon.spaces.get_space(space_id)

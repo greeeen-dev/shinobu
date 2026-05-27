@@ -56,6 +56,7 @@ class BeaconModeration(beacon_cog.BeaconCog):
     @moderation_universal.command(name="kick")
     @bridge.bridge_option("target", description="The target ID. This may be a server ID from any platform.")
     @bridge.bridge_option("space_id", description="The Space ID. Leave empty to use the Space linked to this channel.")
+    @commands.guild_only()
     @CommandChecks.can_manage()
     async def kick(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
                    target: str, space_id: str | None = None):
@@ -85,6 +86,7 @@ class BeaconModeration(beacon_cog.BeaconCog):
     @moderation_universal.command(name="ban")
     @bridge.bridge_option("target", description="The target ID. This may be a server or user ID from any platform.")
     @bridge.bridge_option("space_id", description="The Space ID. Leave empty to use the Space linked to this channel.")
+    @commands.guild_only()
     @CommandChecks.can_manage()
     async def ban(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
                    target: str, space_id: str | None = None):
@@ -105,6 +107,7 @@ class BeaconModeration(beacon_cog.BeaconCog):
     @moderation_universal.command(name="unban")
     @bridge.bridge_option("target", description="The target ID. This may be a server or user ID from any platform.")
     @bridge.bridge_option("space_id", description="The Space ID. Leave empty to use the Space linked to this channel.")
+    @commands.guild_only()
     @CommandChecks.can_manage()
     async def unban(self, ctx: bridge.BridgeApplicationContext | bridge.BridgeExtContext,
                     target: str, space_id: str | None = None):
