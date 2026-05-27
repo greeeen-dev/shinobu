@@ -48,7 +48,7 @@ class FluxerBot(fluxer.Bot):
 
     @property
     def owner_id(self) -> int | None:
-        return self.owner_id
+        return self._owner_id
 
     def is_owner(self, user: fluxer.User) -> bool:
         if not self.owner_id:
