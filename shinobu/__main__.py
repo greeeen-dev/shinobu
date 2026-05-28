@@ -478,9 +478,7 @@ class ExtensionCogMap:
 
         # Ensure cog is a subclass of shinobu_cog.ShinobuCog
         if (
-                type(cog) is commands.Cog or type(cog) is shinobu_cog.ShinobuCog or
-                type(cog) is fluxer.Cog or not isinstance(cog, shinobu_cog.ShinobuCog) or
-                not isinstance(cog, shinobu_cog.ShinobuFluxerCog)
+                not isinstance(cog, shinobu_cog.ShinobuCog) and not isinstance(cog, shinobu_cog.ShinobuFluxerCog)
         ):
             raise TypeError("Cog must be a subclass of shinobu_cog.ShinobuCog or shinobu_cog.ShinobuFluxerCog")
 
