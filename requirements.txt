@@ -1,5 +1,4 @@
 py-cord[speed]
-git+https://github.com/greeeen-dev/spacebar.py.git
 python-dotenv
 pycryptodome
 ujson

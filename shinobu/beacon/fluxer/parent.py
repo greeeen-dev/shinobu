@@ -56,6 +56,38 @@ class FluxerBot(fluxer.Bot):
 
         return user.id == self.owner_id
 
+    def is_admin(self, user: fluxer.User) -> bool:
+        return (
+            self._beacon.moderators.is_admin(str(user.id)) or
+            self.is_owner(user)
+        )
+
+    def is_moderator(self, user: fluxer.User) -> bool:
+        return (
+            self._beacon.moderators.is_moderator(str(user.id)) or
+            self.is_owner(user)
+        )
+
+    def can_check_details(self, user: fluxer.User) -> bool:
+        # Alias for can_manage for now
+        return (
+            self._beacon.moderators.is_moderator(str(user.id)) or
+            self.is_owner(user)
+        )
+
+    def can_moderate(self, user: fluxer.User) -> bool:
+        # Alias for can_manage for now
+        return (
+            self._beacon.moderators.is_moderator(str(user.id)) or
+            self.is_owner(user)
+        )
+
+    def can_manage(self, user: fluxer.User):
+        return (
+            self._beacon.moderators.is_moderator(str(user.id)) or
+            self.is_owner(user)
+        )
+
     @property
     def beacon(self) -> beacon.Beacon:
         return self._beacon

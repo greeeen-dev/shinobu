@@ -35,8 +35,22 @@ class BeaconFrontend(cog.Cog):
 
     @cog.Cog.command(name="new-space")
     async def new_space(self, ctx: fluxer.Message, *, name: str):
-        if ctx.author.id != 1472271558005039139:
+        # noinspection PyUnresolvedReferences
+        if not self.bot.can_manage(ctx.author):
             return
+
+        private_available: bool = (
+            self._beacon.can_create_private_space or
+            self.bot.is_owner(ctx.author)
+        )
+        public_available: bool = (
+            self._beacon.can_create_public_space or
+            self.bot.is_owner(ctx.author)
+        )
+
+        # Check if room creation is possible
+        if not public_available and not private_available:
+            return await ctx.send("space creations are disabled :c")
 
         new_space: beacon_space.BeaconSpace = beacon_space.BeaconSpace(
             space_id=str(uuid.uuid4()),
@@ -51,7 +65,8 @@ class BeaconFrontend(cog.Cog):
 
     @cog.Cog.command(name="join-space")
     async def join_space(self, ctx: fluxer.Message, space_id: str):
-        if ctx.author.id != 1472271558005039139:
+        # noinspection PyUnresolvedReferences
+        if not self.bot.can_manage(ctx.author):
             return
 
         space: beacon_space.BeaconSpace | None = self._beacon.spaces.get_space(space_id)
