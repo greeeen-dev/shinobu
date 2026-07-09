@@ -695,7 +695,7 @@ class DiscordDriver(beacon_driver.BeaconDriver):
 
         # Get webhook (if needed)
         webhook_obj: discord.Webhook | None = None
-        if send_as_webhook:
+        if send_as_webhook and webhook_id:
             # Ensure webhook is in cache
             await self.getch_webhook(webhook_id)
 
@@ -764,7 +764,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 files=discord_content.files,
                 username=custom_name,
                 avatar_url=custom_avatar,
-                wait=True
+                wait=True,
+                allowed_mentions=discord.AllowedMentions.none()
             )
         else:
             if not target:
@@ -774,7 +775,8 @@ class DiscordDriver(beacon_driver.BeaconDriver):
                 content=discord_content.content,
                 view=discord_content.components,
                 embeds=discord_content.embeds,
-                files=discord_content.files
+                files=discord_content.files,
+                allowed_mentions=discord.AllowedMentions.none()
             )
 
         return beacon_message.BeaconMessage(
