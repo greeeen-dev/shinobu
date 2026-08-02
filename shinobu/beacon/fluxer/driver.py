@@ -205,7 +205,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
 
         if cached_member:
             cached_member.name = member.user.username
-            cached_member.display_name = member.user.global_name
+            cached_member.display_name = member.nick or member.user.global_name
             cached_member.avatar_url = member.user.avatar_url
             return cached_member
         else:
@@ -214,7 +214,7 @@ class FluxerDriver(beacon_driver.BeaconDriver):
                 platform=self.platform,
                 name=member.user.username,
                 server=server,
-                display_name=member.user.global_name,
+                display_name=member.nick or member.user.global_name,
                 avatar_url=member.user.avatar_url
             )
             self.members.store_object(new_member, id_override=f"{member.user.id}_{server.id}")
